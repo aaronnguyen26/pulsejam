@@ -5,7 +5,7 @@ PulseJam AI is a 100% client-side, zero-backend Next.js application that listens
 It features four integrated layers & targets:
 1. **Stems Mode (Stage 1)**: Dynamically crossfades between 3 tiers of backing-track stems (**Chill / Groove / Peak**) based on playing volume and attack density.
 2. **AI Generation Mode (Stage 2)**: Runs real-time YIN monophonic pitch detection in AudioWorklet, feeds discrete MIDI note sequences to a dedicated Web Worker running **Magenta.js** (`@magenta/music` with TensorFlow.js WASM backend), and generates 1-bar lookahead drum + bass/melody accompaniment.
-3. **Cloud "Vibe" Layer (Stage 3)**: An optional, slow-morphing generative ambient/textural overlay powered by Google's **Lyria RealTime model** (`models/lyria-realtime-exp`), driven by live playing telemetry. 100% **Bring Your Own Key (BYOK)**.
+3. **Cloud "Vibe" Layer (Stage 3)**: An tional, slow-morphing generative ambient/textural overlay powered by Google's **Lyria RealTime model** (`models/lyria-realtime-exp`), driven by live playing telemetry. 100% **Bring Your Own Key (BYOK)**.
 4. **Standalone macOS Desktop App (Stage 4)**: Tauri-wrapped native macOS application (`.dmg` installer) generated from the same single codebase.
 
 ---

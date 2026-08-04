@@ -1,21 +1,79 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 /**
- * Screen Component: PulseJam Refined Brand Experience
- * Extracted from Stitch MCP screen 'f377a580635343ff8e3bf4ab2d692dd3'
- * Follows DESIGN.md specifications for typography (EB Garamond + Hanken Grotesk),
- * Warm Brass Gold palette (#f2ca50, #d4af37), glassmorphism, and Lenis smooth scrolling.
+ * Screen Component: PulseJam Cinematic Narrative Experience
+ * Extracted from Stitch MCP screen 'c630a39a9ca245aca7f6f2586b4f0532' ('Pulsejam: Cinematic Narrative Experience')
+ * 
+ * Features:
+ * 1. Pinned/Scroll-Jacked Scenarios Section with GSAP ScrollTrigger:
+ *    - Pinned in place when reaching the top of the viewport.
+ *    - Scroll input drives left-to-right horizontal state transitions (Practice → Growth → Performance).
+ *    - Unpins ONLY once Performance card is reached.
+ *    - Zero dead space: transitions directly into #security ("Your Music, Your Privacy").
+ *    - Properly synced with Lenis smooth scroll and cleaned up via gsap.context revert.
  */
 export const RefinedBrandExperienceScreen: React.FC = () => {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [complexity, setComplexity] = useState(75);
 
+  // GSAP ScrollTrigger references for Scenarios Pinned Section
+  const scenariosRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [progressVal, setProgressVal] = useState(0);
+
+  useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
+    const section = scenariosRef.current;
+    const track = trackRef.current;
+
+    if (!section || !track) return;
+
+    // Use GSAP Context for scope safety and clean unmount cleanup
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: section,
+          pin: true,
+          start: 'top top',
+          end: '+=200%', // 200% scroll distance for 3 panels
+          scrub: 0.5,
+          anticipatePin: 1,
+          onUpdate: (self) => {
+            const p = self.progress;
+            setProgressVal(p);
+            if (p < 0.33) {
+              setActiveIndex(0);
+            } else if (p < 0.66) {
+              setActiveIndex(1);
+            } else {
+              setActiveIndex(2);
+            }
+          },
+        },
+      });
+
+      // Scrub horizontal track from 0% to -66.666%
+      tl.to(track, {
+        xPercent: -66.666,
+        ease: 'none',
+      });
+    }, scenariosRef);
+
+    return () => {
+      ctx.revert();
+    };
+  }, []);
+
   return (
     <div className="bg-[#131313] text-[#e5e2e1] min-h-screen font-body-md relative overflow-x-hidden selection:bg-[#d4af37] selection:text-[#3c2f00]">
-      {/* Atmospheric Top Gradient */}
+      {/* Atmospheric Top Background Gradient */}
       <div className="fixed top-0 inset-x-0 h-64 bg-gradient-to-b from-[#131313] via-[#131313]/80 to-transparent -z-10 pointer-events-none" />
 
       {/* ── Top Navigation ───────────────────────────────────────────── */}
@@ -71,19 +129,6 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                     <span className="text-xs text-[#d0c5af]">Apple Silicon (.dmg)</span>
                   </div>
                 </a>
-                <a
-                  href="#"
-                  className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 rounded-lg transition-colors group text-slate-100 opacity-60"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e7c9a6" strokeWidth="2">
-                    <rect x="2" y="3" width="20" height="14" rx="2" />
-                    <line x1="8" y1="21" x2="16" y2="21" />
-                  </svg>
-                  <div className="flex flex-col">
-                    <span className="font-body-md font-medium text-sm">Download for Windows</span>
-                    <span className="text-xs text-[#d0c5af]">Windows 10/11</span>
-                  </div>
-                </a>
               </div>
             )}
           </div>
@@ -92,7 +137,15 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
 
       <main className="pt-24">
         {/* ── Hero Section ────────────────────────────────────────────── */}
-        <section className="min-h-[90vh] flex flex-col justify-center py-24 relative px-6 md:px-12 max-w-[1280px] mx-auto">
+        <section className="min-h-[90vh] flex flex-col justify-center py-24 relative px-6 md:px-12 max-w-[1280px] mx-auto overflow-hidden">
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-15 mix-blend-luminosity"
+              style={{ backgroundImage: "url('/images/hero_studio_bg.jpg')" }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#131313] via-[#131313]/80 to-[#131313]" />
+          </div>
+
           <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-[#f2ca50]/10 rounded-full blur-[140px] pointer-events-none" />
 
           <motion.div
@@ -107,7 +160,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
             </h1>
 
             <p className="font-body-lg text-body-lg text-[#d0c5af] max-w-2xl leading-relaxed text-xl md:text-2xl opacity-90">
-              Meet the AI that listens and reacts like a real bandmate. PulseJam Engine breathes life into your practice sessions, transforming cold code into warm, responsive musical accompaniment.
+              Meet the AI that listens and reacts like a real bandmate. PulseJam AI breathes life into your practice sessions, transforming cold code into warm, responsive musical accompaniment.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-6 pt-6">
@@ -134,11 +187,11 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
         </section>
 
         {/* Soft Transition */}
-        <div className="h-48 bg-gradient-to-b from-transparent via-[#131313] to-[#131313]" />
+        <div className="h-32 bg-gradient-to-b from-transparent via-[#131313] to-[#131313]" />
 
         {/* ── Section 1: The Vision ───────────────────────────────────── */}
         <section id="vision" className="px-6 md:px-12 max-w-[1280px] mx-auto py-32 relative">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-center relative z-10">
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -161,115 +214,175 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               </p>
 
               <p className="font-body-md text-[#d0c5af] text-lg leading-relaxed">
-                It analyzes your playing style in real-time, matching your dynamics, shifting tempo when you push, and pulling back when you breathe. It's the ultimate sparring partner for your musical journey.
+                It analyzes your playing style in real-time, matching your dynamics, shifting tempo when you push, and pulling back when you breathe.
               </p>
             </motion.div>
 
-            {/* Asymmetrical Studio Deck Card */}
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: '-50px' }}
               transition={{ duration: 0.8 }}
-              className="md:col-span-6 relative"
+              className="md:col-span-6 relative mt-16 md:mt-0"
             >
-              <div className="glass-panel rounded-2xl p-8 border border-hairline highlight-top shadow-2xl space-y-6">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-caps text-xs text-[#f2ca50] tracking-widest uppercase">REAL-TIME DSP ENGINE</span>
-                  <span className="font-mono text-xs text-[#e7c9a6]">0.4ms Latency</span>
+              <div className="relative w-full aspect-[4/5] md:aspect-square">
+                <div className="absolute right-0 top-0 w-[80%] h-[90%] glass-panel rounded-2xl overflow-hidden border border-hairline highlight-top z-20 animate-float shadow-2xl">
+                  <div
+                    className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-70"
+                    style={{ backgroundImage: "url('/images/vision_console.jpg')" }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-[#131313]/90 via-[#131313]/20 to-transparent" />
                 </div>
 
-                <div className="h-40 bg-[#0e0e0e] rounded-xl p-4 border border-[#4d4635] flex items-end gap-1.5 justify-between">
-                  {[45, 70, 35, 90, 100, 75, 55, 65, 95, 85, 50, 92, 80, 65, 90, 100, 70, 45, 80, 95].map((h, idx) => (
-                    <div
-                      key={idx}
-                      className="flex-1 bg-gradient-to-t from-[#d4af37] via-[#f2ca50] to-[#ffe088] rounded-t-sm transition-all duration-300"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between font-mono text-xs text-[#d0c5af]">
-                  <span>Signal Input: Mic / AudioWorklet</span>
-                  <span className="text-emerald-400">ACTIVE PASS</span>
+                <div className="absolute left-0 bottom-0 w-[60%] h-[60%] bg-[#2a2a2a] rounded-2xl border border-[#e7c9a6]/20 overflow-hidden z-10 animate-float-delayed p-6 flex flex-col justify-end">
+                  <div className="absolute inset-0 bg-[#131313]/80" />
+                  <div className="relative z-10">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f2ca50" strokeWidth="2" className="mb-2">
+                      <path d="M12 2v20M17 5v14M7 8v8" />
+                    </svg>
+                    <p className="font-label-caps text-[#f2ca50] tracking-widest text-[10px]">REAL-TIME ANALYSIS</p>
+                  </div>
                 </div>
               </div>
             </motion.div>
           </div>
         </section>
 
-        {/* ── Section 2: The Process (Flow Journey) ──────────────────── */}
-        <section id="experience" className="py-32 relative bg-[#0e0e0e]/50 border-t border-hairline">
-          <div className="px-6 md:px-12 max-w-[1280px] mx-auto text-center mb-24 space-y-4">
+        {/* ── Section 2: Cinematic Narrative Experience - The Process ── */}
+        <section id="experience" className="py-32 relative bg-[#0e0e0e]/60 border-t border-hairline overflow-hidden">
+          <div className="px-6 md:px-12 max-w-[1280px] mx-auto text-center mb-24 relative z-10 space-y-4">
             <span className="font-label-caps text-xs text-[#e7c9a6] uppercase tracking-widest">The Process</span>
             <h2 className="font-headline-md text-4xl sm:text-5xl text-[#e5e2e1]">Intuitive By Design</h2>
           </div>
 
-          <div className="px-6 md:px-12 max-w-[1000px] mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-              {/* Step 1 */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
+          <div className="px-6 md:px-12 max-w-[1000px] mx-auto relative z-10">
+            {/* Animated SVG Connecting Path */}
+            <svg
+              className="hidden md:block absolute top-24 left-1/2 -translate-x-1/2 w-[800px] h-[500px] pointer-events-none z-0"
+              fill="none"
+              viewBox="0 0 800 500"
+            >
+              <motion.path
+                d="M 100 0 C 100 200, 700 100, 700 300 C 700 400, 400 450, 400 500"
+                stroke="url(#paint_narrative_line)"
+                strokeDasharray="8 8"
+                strokeWidth="2.5"
+                initial={{ pathLength: 0 }}
+                whileInView={{ pathLength: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="glass-panel p-8 rounded-2xl border border-hairline highlight-top flex flex-col justify-between space-y-6"
+                transition={{ duration: 2.5, ease: 'easeInOut' }}
+              />
+              <defs>
+                <linearGradient id="paint_narrative_line" x1="100" y1="0" x2="400" y2="500" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#f2ca50" stopOpacity="0.1" />
+                  <stop offset="0.5" stopColor="#f2ca50" stopOpacity="0.6" />
+                  <stop offset="1" stopColor="#f2ca50" stopOpacity="0.1" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            {/* 3 Steps with Authentic Cinematic Images */}
+            <div className="flex flex-col space-y-24 md:space-y-40 relative z-10">
+              {/* Step 1: Plug In */}
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.8, ease: [0.215, 0.61, 0.355, 1] }}
+                className="flex flex-col md:flex-row items-center gap-12 md:gap-24"
               >
-                <div>
-                  <div className="w-16 h-16 rounded-full bg-[#f2ca50]/10 border border-[#f2ca50]/30 flex items-center justify-center mb-6 text-[#f2ca50]">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 2v20M17 5v14M7 8v8" />
-                    </svg>
-                  </div>
-                  <span className="font-label-caps text-xs text-[#f2ca50] tracking-widest block mb-2">STEP 01</span>
-                  <h3 className="font-headline-sm text-2xl text-[#e5e2e1] mb-3">Plug In</h3>
-                  <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed">
+                <div className="w-full md:w-1/2 flex justify-center md:justify-end">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/30 overflow-hidden relative group shadow-[0_0_40px_rgba(242,202,80,0.2)]"
+                  >
+                    <div
+                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                      style={{ backgroundImage: "url('/images/process_step1.jpg')" }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
+                    <div className="absolute bottom-4 inset-x-0 text-center">
+                      <span className="font-label-caps text-[10px] text-[#f2ca50] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline">
+                        Audio Input
+                      </span>
+                    </div>
+                  </motion.div>
+                </div>
+                <div className="w-full md:w-1/2 text-center md:text-left">
+                  <span className="font-label-caps text-[#f2ca50] tracking-widest text-sm mb-3 block">STEP 01</span>
+                  <h3 className="font-headline-sm text-3xl md:text-4xl text-[#e5e2e1] mb-4">Plug In</h3>
+                  <p className="font-body-md text-[#d0c5af] text-lg leading-relaxed">
                     Connect your instrument or microphone directly to your device. No complex routing required.
                   </p>
                 </div>
               </motion.div>
 
-              {/* Step 2 */}
+              {/* Step 2: Play Naturally */}
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="glass-panel p-8 rounded-2xl border border-hairline highlight-top flex flex-col justify-between space-y-6"
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.8, delay: 0.15, ease: [0.215, 0.61, 0.355, 1] }}
+                className="flex flex-col md:flex-row-reverse items-center gap-12 md:gap-24"
               >
-                <div>
-                  <div className="w-16 h-16 rounded-full bg-[#e7c9a6]/10 border border-[#e7c9a6]/30 flex items-center justify-center mb-6 text-[#e7c9a6]">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 18V5l12-2v13" />
-                      <circle cx="6" cy="18" r="3" />
-                      <circle cx="18" cy="16" r="3" />
-                    </svg>
-                  </div>
-                  <span className="font-label-caps text-xs text-[#e7c9a6] tracking-widest block mb-2">STEP 02</span>
-                  <h3 className="font-headline-sm text-2xl text-[#e5e2e1] mb-3">Play Naturally</h3>
-                  <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed">
+                <div className="w-full md:w-1/2 flex justify-center md:justify-start">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/30 overflow-hidden relative group shadow-[0_0_40px_rgba(231,201,166,0.2)]"
+                  >
+                    <div
+                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                      style={{ backgroundImage: "url('/images/process_step2.jpg')" }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
+                    <div className="absolute bottom-4 inset-x-0 text-center">
+                      <span className="font-label-caps text-[10px] text-[#e7c9a6] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline">
+                        Live Pitch & Tempo
+                      </span>
+                    </div>
+                  </motion.div>
+                </div>
+                <div className="w-full md:w-1/2 text-center md:text-right">
+                  <span className="font-label-caps text-[#e7c9a6] tracking-widest text-sm mb-3 block">STEP 02</span>
+                  <h3 className="font-headline-sm text-3xl md:text-4xl text-[#e5e2e1] mb-4">Play Naturally</h3>
+                  <p className="font-body-md text-[#d0c5af] text-lg leading-relaxed">
                     Just start playing. The engine instantly detects key, tempo, and dynamic intensity.
                   </p>
                 </div>
               </motion.div>
 
-              {/* Step 3 */}
+              {/* Step 3: The App Reacts */}
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="glass-panel p-8 rounded-2xl border border-hairline highlight-top flex flex-col justify-between space-y-6"
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.8, delay: 0.3, ease: [0.215, 0.61, 0.355, 1] }}
+                className="flex flex-col md:flex-row items-center gap-12 md:gap-24"
               >
-                <div>
-                  <div className="w-16 h-16 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center mb-6 text-[#d4af37]">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                    </svg>
-                  </div>
-                  <span className="font-label-caps text-xs text-[#d4af37] tracking-widest block mb-2">STEP 03</span>
-                  <h3 className="font-headline-sm text-2xl text-[#e5e2e1] mb-3">The App Reacts</h3>
-                  <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed">
+                <div className="w-full md:w-1/2 flex justify-center md:justify-end">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/30 overflow-hidden relative group shadow-[0_0_40px_rgba(212,175,55,0.2)]"
+                  >
+                    <div
+                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                      style={{ backgroundImage: "url('/images/process_step3.jpg')" }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
+                    <div className="absolute bottom-4 inset-x-0 text-center">
+                      <span className="font-label-caps text-[10px] text-[#d4af37] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline">
+                        AI Companion Stems
+                      </span>
+                    </div>
+                  </motion.div>
+                </div>
+                <div className="w-full md:w-1/2 text-center md:text-left">
+                  <span className="font-label-caps text-[#d4af37] tracking-widest text-sm mb-3 block">STEP 03</span>
+                  <h3 className="font-headline-sm text-3xl md:text-4xl text-[#e5e2e1] mb-4">The App Reacts</h3>
+                  <p className="font-body-md text-[#d0c5af] text-lg leading-relaxed">
                     Experience a backing track that ebbs and flows with your performance, creating a unique jam every time.
                   </p>
                 </div>
@@ -278,79 +391,173 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
           </div>
         </section>
 
-        {/* ── Section 3: Everyday Jams (Scenarios Bento Grid) ─────────── */}
-        <section id="stories" className="px-6 md:px-12 max-w-[1280px] mx-auto py-32 border-t border-hairline">
-          <div className="max-w-2xl mb-16 space-y-4">
-            <span className="font-label-caps text-xs text-[#e7c9a6] uppercase tracking-widest">Scenarios</span>
-            <h2 className="font-headline-md text-4xl sm:text-5xl text-[#e5e2e1]">Everyday Jams</h2>
-            <p className="font-body-lg text-lg text-[#d0c5af]">
-              Whether you are refining your technique or exploring new creative horizons, PulseJam adapts to your environment.
-            </p>
-          </div>
+        {/* ── Section 3: GSAP SCROLLTRIGGER PINNED SCENARIOS SECTION ──── */}
+        <section id="stories" ref={scenariosRef} className="h-screen w-full relative border-t border-hairline bg-[#131313] overflow-hidden">
+          <div className="w-full h-full flex flex-col justify-between p-6 md:p-10 relative z-10">
+            {/* Ambient Backdrops */}
+            <div className="absolute inset-0 pointer-events-none -z-10">
+              <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-[#f2ca50]/5 rounded-full blur-[160px]" />
+              <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-[#e7c9a6]/5 rounded-full blur-[160px]" />
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-            {/* Card 1 */}
-            <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-2xl border border-hairline p-8 relative overflow-hidden flex flex-col justify-end min-h-[360px] shadow-xl">
-              <div className="space-y-3 relative z-10">
-                <span className="font-label-caps text-xs border border-[#4d4635] rounded-full px-4 py-1.5 inline-block text-[#e7c9a6] bg-[#131313]/60 backdrop-blur">
-                  Acoustic Setup
+            {/* Header Stage Selector Bar */}
+            <div className="max-w-[1280px] mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-4 pt-2 z-20">
+              <div>
+                <span className="font-label-caps text-xs text-[#e7c9a6] uppercase tracking-widest block mb-1">
+                  Scenarios
                 </span>
-                <h3 className="font-headline-sm text-3xl text-[#e5e2e1]">The Living Room Concert</h3>
-                <p className="font-body-md text-sm text-[#d0c5af] max-w-md leading-relaxed">
-                  Transform quiet evenings into full-band experiences. Practice silently with headphones while feeling the weight of a live ensemble.
-                </p>
+                <h2 className="font-headline-md text-3xl md:text-4xl text-[#e5e2e1]">Everyday Jams</h2>
+              </div>
+
+              {/* Dynamic Stage Pill Highlights */}
+              <div className="flex items-center gap-3 bg-[#201f1f] px-4 py-2 rounded-full border border-hairline shadow-inner">
+                <span className={`font-label-caps text-xs px-3 py-1 rounded-full transition-all duration-300 ${
+                  activeIndex === 0 ? 'text-[#f2ca50] bg-[#f2ca50]/15 font-bold border border-[#f2ca50]/40' : 'text-[#d0c5af]/60'
+                }`}>
+                  01 PRACTICE
+                </span>
+                <span className="text-[#e7c9a6]/40">•</span>
+                <span className={`font-label-caps text-xs px-3 py-1 rounded-full transition-all duration-300 ${
+                  activeIndex === 1 ? 'text-[#f2ca50] bg-[#f2ca50]/15 font-bold border border-[#f2ca50]/40' : 'text-[#d0c5af]/60'
+                }`}>
+                  02 GROWTH
+                </span>
+                <span className="text-[#e7c9a6]/40">•</span>
+                <span className={`font-label-caps text-xs px-3 py-1 rounded-full transition-all duration-300 ${
+                  activeIndex === 2 ? 'text-[#f2ca50] bg-[#f2ca50]/15 font-bold border border-[#f2ca50]/40' : 'text-[#d0c5af]/60'
+                }`}>
+                  03 PERFORMANCE
+                </span>
+                <div className="w-20 h-1.5 bg-[#0e0e0e] rounded-full overflow-hidden border border-hairline ml-2 hidden sm:block">
+                  <div
+                    className="h-full bg-gradient-brass rounded-full origin-left transition-all duration-150"
+                    style={{ transform: `scaleX(${Math.max(0.15, progressVal)})` }}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Card 2: Interactive Complexity */}
-            <div className="md:col-span-5 glass-panel border border-hairline rounded-2xl p-8 flex flex-col justify-between shadow-xl space-y-6">
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-full bg-[#2a2a2a] border border-[#e7c9a6]/30 flex items-center justify-center text-[#e7c9a6]">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 10v6M2 10v6M12 2v20" />
-                  </svg>
-                </div>
-                <h3 className="font-headline-sm text-2xl text-[#e5e2e1]">Mastering New Scales</h3>
-                <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed">
-                  Set parameters for complex modes and let the AI challenge you with unpredictable chord voicings and rhythmic variations.
-                </p>
-              </div>
+            {/* Horizontal Track Canvas: Scrubbed via GSAP ScrollTrigger (0% -> -66.666%) */}
+            <div className="w-full flex-1 flex items-center overflow-hidden relative my-auto">
+              <div
+                ref={trackRef}
+                className="flex flex-row w-[300%] h-full items-center shrink-0"
+              >
+                {/* ── PANEL 1: PRACTICE ── */}
+                <div className="w-1/3 h-full px-4 md:px-12 flex items-center justify-center shrink-0">
+                  <div className="max-w-[1280px] w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                    <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-3xl border border-hairline p-8 md:p-12 relative overflow-hidden flex flex-col justify-end min-h-[380px] md:min-h-[460px] shadow-2xl group">
+                      <div
+                        className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-50 group-hover:opacity-75 transition-opacity duration-700 group-hover:scale-105"
+                        style={{ backgroundImage: "url('/images/living_room_jam.jpg')" }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-[#131313]/60 to-transparent" />
 
-              {/* Slider UI */}
-              <div className="space-y-3 bg-[#131313]/60 p-4 rounded-xl border border-hairline">
-                <div className="flex justify-between items-center font-label-caps text-xs text-[#d0c5af]">
-                  <span>Complexity Control</span>
-                  <span className="text-[#f2ca50] font-bold">{complexity}% Advanced</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={complexity}
-                  onChange={(e) => setComplexity(Number(e.target.value))}
-                  className="w-full accent-[#f2ca50] bg-[#0e0e0e] h-2 rounded-lg cursor-pointer"
-                />
-              </div>
-            </div>
+                      <div className="space-y-4 relative z-10">
+                        <span className="font-label-caps text-xs border border-[#4d4635] rounded-full px-4 py-1.5 inline-block text-[#e7c9a6] bg-[#131313]/70 backdrop-blur">
+                          Practice
+                        </span>
+                        <h3 className="font-headline-sm text-3xl md:text-5xl text-[#e5e2e1]">The Living Room Concert</h3>
+                        <p className="font-body-md text-base md:text-lg text-[#d0c5af] max-w-lg leading-relaxed">
+                          Transform quiet evenings into full-band experiences. Practice silently with headphones while feeling the weight of a live ensemble breathing with every note.
+                        </p>
+                      </div>
+                    </div>
 
-            {/* Card 3 */}
-            <div className="md:col-span-12 glass-panel border border-hairline rounded-2xl p-8 md:p-12 highlight-top flex flex-col md:flex-row justify-between items-start md:items-center gap-8 shadow-xl">
-              <div className="max-w-2xl space-y-3">
-                <h3 className="font-headline-sm text-2xl md:text-3xl text-[#e5e2e1]">The Live Performance Companion</h3>
-                <p className="font-body-md text-sm md:text-base text-[#d0c5af] leading-relaxed">
-                  Take it to the stage. PulseJam acts as an invisible safety net, generating stems that align perfectly with your live playing dynamics.
-                </p>
-              </div>
-              <div className="flex items-center gap-3 bg-[#201f1f] px-6 py-3.5 rounded-full border border-[#e7c9a6]/20 shrink-0">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-label-caps text-xs text-[#e7c9a6] tracking-wider uppercase">Zero Latency Local DSP</span>
+                    <div className="md:col-span-5 glass-panel border border-hairline rounded-3xl p-8 md:p-10 highlight-top shadow-2xl space-y-4">
+                      <div className="font-label-caps text-xs text-[#f2ca50] tracking-widest">SCENARIO 01 · PRACTICE</div>
+                      <h4 className="font-headline-sm text-2xl text-[#e5e2e1]">Intimate Solo Jam</h4>
+                      <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed mb-4">
+                        Focus on the dynamic interaction between acoustic guitar riffs and responsive backing stem layers.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── PANEL 2: GROWTH ── */}
+                <div className="w-1/3 h-full px-4 md:px-12 flex items-center justify-center shrink-0">
+                  <div className="max-w-[1280px] w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                    <div className="md:col-span-6 glass-panel border border-hairline rounded-3xl p-8 md:p-12 highlight-top shadow-2xl space-y-6">
+                      <span className="font-label-caps text-xs text-[#e7c9a6] border border-[#4d4635] rounded-full px-4 py-1.5 inline-block bg-[#131313]/70">
+                        Growth
+                      </span>
+                      <h3 className="font-headline-sm text-3xl md:text-5xl text-[#e5e2e1]">Mastering New Scales</h3>
+                      <p className="font-body-md text-base md:text-lg text-[#d0c5af] leading-relaxed">
+                        Break out of your rut. Set parameters for complex modes and let the AI challenge you with unpredictable chord voicings and rhythmic variations.
+                      </p>
+                    </div>
+
+                    <div className="md:col-span-6 glass-panel border border-hairline rounded-3xl p-8 md:p-10 highlight-top shadow-2xl space-y-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-full bg-[#f2ca50]/10 border border-[#f2ca50]/30 flex items-center justify-center text-[#f2ca50]">
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M22 10v6M2 10v6M12 2v20" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="font-headline-sm text-2xl text-[#e5e2e1]">AI Mode Complexity</h4>
+                          <p className="font-label-caps text-xs text-[#d0c5af]">Dynamic Harmonics Engine</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 bg-[#131313]/80 p-6 rounded-2xl border border-hairline">
+                        <div className="flex justify-between items-center font-label-caps text-xs text-[#d0c5af]">
+                          <span>Complexity Control</span>
+                          <span className="text-[#f2ca50] font-bold">{complexity}% Advanced</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={complexity}
+                          onChange={(e) => setComplexity(Number(e.target.value))}
+                          className="w-full accent-[#f2ca50] bg-[#0e0e0e] h-2.5 rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── PANEL 3: PERFORMANCE ── */}
+                <div className="w-1/3 h-full px-4 md:px-12 flex items-center justify-center shrink-0">
+                  <div className="max-w-[1280px] w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                    <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-3xl border border-hairline p-8 md:p-12 relative overflow-hidden flex flex-col justify-end min-h-[380px] md:min-h-[460px] shadow-2xl group">
+                      <div
+                        className="absolute inset-0 bg-cover bg-center opacity-60 mix-blend-luminosity group-hover:opacity-80 transition-opacity duration-700 group-hover:scale-105"
+                        style={{ backgroundImage: "url('/images/scenario_performance.jpg')" }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-[#131313]/60 to-transparent" />
+
+                      <div className="space-y-4 relative z-10">
+                        <span className="font-label-caps text-xs border border-[#4d4635] rounded-full px-4 py-1.5 inline-block text-[#f2ca50] bg-[#131313]/70 backdrop-blur">
+                          Performance
+                        </span>
+                        <h3 className="font-headline-sm text-3xl md:text-5xl text-[#e5e2e1]">The Live Companion</h3>
+                        <p className="font-body-md text-base md:text-lg text-[#d0c5af] max-w-lg leading-relaxed">
+                          Take it to the stage. PulseJam acts as an invisible safety net, generating stems that align perfectly with your live band's tempo fluctuations, ensuring a remarkably tight sound.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-5 glass-panel border border-hairline rounded-3xl p-8 md:p-10 highlight-top shadow-2xl space-y-6">
+                      <div className="font-label-caps text-xs text-[#f2ca50] tracking-widest">SCENARIO 03 · PERFORMANCE</div>
+                      <div className="flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="font-label-caps text-xs text-[#e7c9a6] uppercase tracking-wider">Zero Latency Sync</span>
+                      </div>
+                      <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed">
+                        Real-time AudioWorklet YIN pitch detection & DSP stem alignment running completely client-side.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── Section 4: Security & Privacy ───────────────────────────── */}
-        <section id="security" className="py-32 relative border-t border-hairline bg-[#0e0e0e]/60">
+        {/* ── Section 4: Security & Privacy (Transitions directly from Performance with 0 dead space) ── */}
+        <section id="security" className="py-24 relative border-t border-hairline bg-[#0e0e0e]/60">
           <div className="px-6 md:px-12 max-w-[1280px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-24">
             <div className="space-y-8">
               <div className="inline-flex items-center gap-2 border border-[#4d4635] rounded-full px-4 py-1.5 bg-[#201f1f]/50 backdrop-blur">
@@ -367,7 +574,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               </h2>
 
               <p className="font-body-md text-base md:text-lg text-[#d0c5af] leading-relaxed">
-                Creative integrity demands a secure environment. PulseJam Engine operates entirely on local processing. We don't upload your audio to external cloud servers or harvest your riffs.
+                Creative integrity demands a secure environment. PulseJam AI operates entirely on local processing. We don't upload your audio to external cloud servers or harvest your riffs.
               </p>
 
               <ul className="space-y-4 pt-2">
@@ -435,7 +642,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               PulseJam AI
             </a>
             <p className="font-body-md text-xs text-[#d0c5af] mt-2">
-              © 2026 PulseJam AI. Crafted with PulseJam Engine & Lenis Smooth Scroll.
+              © 2026 PulseJam AI. All rights reserved.
             </p>
           </div>
           <div className="flex flex-wrap gap-6 font-label-caps text-xs text-[#d0c5af]">

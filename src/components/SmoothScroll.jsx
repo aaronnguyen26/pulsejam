@@ -3,13 +3,17 @@
 import { useEffect } from 'react';
 import Lenis from 'lenis';
 import 'lenis/dist/lenis.css';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+// Register GSAP ScrollTrigger plugin globally
+gsap.registerPlugin(ScrollTrigger);
 
 /**
- * SmoothScroll component initializing Lenis and syncing scroll updates with Motion.
+ * SmoothScroll component initializing Lenis and syncing scroll updates with GSAP ScrollTrigger and Motion.
  * 
- * Drives Lenis via requestAnimationFrame and triggers window scroll events on
- * Lenis scroll ticks so Motion's useScroll(), useTransform(), and whileInView
- * animations stay frame-perfect with Lenis's smoothed scroll position.
+ * Drives Lenis via GSAP ticker for frame-perfect sync between Lenis smooth scrolling,
+ * GSAP ScrollTrigger pinning, and Motion scroll hooks.
  */
 export default function SmoothScroll({ children }) {
   useEffect(() => {
@@ -20,24 +24,23 @@ export default function SmoothScroll({ children }) {
       smoothWheel: true,
     });
 
-    // 4 & 5. Sync Lenis scroll updates with Motion listeners (useScroll, whileInView, useTransform)
+    // 2. Sync Lenis scroll updates with GSAP ScrollTrigger & window listeners
     lenis.on('scroll', () => {
+      ScrollTrigger.update();
       window.dispatchEvent(new Event('scroll'));
     });
 
-    // 1. Drive Lenis via requestAnimationFrame
-    let animationFrameId;
+    // 3. Drive Lenis via GSAP's ticker for zero-jitter pinning
+    const updateRaf = (time) => {
+      lenis.raf(time * 1000);
+    };
 
-    function raf(time) {
-      lenis.raf(time);
-      animationFrameId = requestAnimationFrame(raf);
-    }
-
-    animationFrameId = requestAnimationFrame(raf);
+    gsap.ticker.add(updateRaf);
+    gsap.ticker.lagSmoothing(0);
 
     // Cleanup on unmount
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      gsap.ticker.remove(updateRaf);
       lenis.destroy();
     };
   }, []);
