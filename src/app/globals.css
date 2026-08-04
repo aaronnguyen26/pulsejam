@@ -1,0 +1,272 @@
+@import "tailwindcss";
+
+/* ─── Design Token System ────────────────────────────────────────────── */
+:root {
+  /* Core palette */
+  --col-void:    #080b12;   /* app bg — near-black, slight blue cast */
+  --col-surface: #0f1420;   /* module surfaces */
+  --col-panel:   #141929;   /* card/rack faces */
+  --col-edge:    rgba(255, 255, 255, 0.06); /* border */
+  --col-edge-hi: rgba(255, 255, 255, 0.12); /* brighter border, hover/active */
+
+  /* Tier accent colors — ice / ember / surge */
+  --col-ice:     #00d4ff;   /* Chill — phosphor cyan */
+  --col-ember:   #ff8c00;   /* Groove — deep amber */
+  --col-surge:   #ff2d6e;   /* Peak — magenta-red */
+
+  /* Tier glow (box-shadow values) */
+  --glow-ice:    0 0 18px rgba(0, 212, 255, 0.4);
+  --glow-ember:  0 0 18px rgba(255, 140, 0, 0.4);
+  --glow-surge:  0 0 18px rgba(255, 45, 110, 0.4);
+
+  /* Semantic */
+  --col-ok:      #22c55e;   /* green — mic active, pass */
+  --col-warn:    #f59e0b;   /* amber — warning */
+  --col-err:     #ef4444;   /* red — error */
+
+  /* Typography */
+  --font-display: var(--font-space-grotesk), "Space Grotesk", system-ui, sans-serif;
+  --font-data:    var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+}
+
+/* ─── Base Reset & Body ──────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--col-void);
+  color: #e2e8f0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Keyboard Focus ─────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--col-ice) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+
+/* ─── Rack Module Surfaces ───────────────────────────────────────────── */
+.rack-module {
+  background: linear-gradient(160deg, var(--col-panel) 0%, #0d1320 100%);
+  border: 1px solid var(--col-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--col-edge-hi),
+    0 8px 24px -4px rgba(0, 0, 0, 0.5);
+}
+
+.rack-bezel {
+  background: var(--col-void);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+
+/* ─── LED / Glow Classes ─────────────────────────────────────────────── */
+.led-live {
+  box-shadow: 0 0 8px var(--col-ok), 0 0 14px rgba(34, 197, 94, 0.3);
+}
+
+.led-ice {
+  box-shadow: var(--glow-ice);
+}
+
+.led-ember {
+  box-shadow: var(--glow-ember);
+}
+
+.led-surge {
+  box-shadow: var(--glow-surge);
+}
+
+/* ─── Data / Mono Font Utility ───────────────────────────────────────── */
+.font-data {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Section Label (minimal usage — max 1 per 3 sections) ──────────── */
+.section-label {
+  font-family: var(--font-data);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.6);
+}
+
+/* ─── Tier Color Classes ─────────────────────────────────────────────── */
+.tier-ice   { color: var(--col-ice); }
+.tier-ember { color: var(--col-ember); }
+.tier-surge { color: var(--col-surge); }
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: var(--col-void); }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ─── Tier Gauge ─────────────────────────────────────────────────────── */
+.tier-zone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    color 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.tier-zone.active-ice {
+  color: var(--col-ice);
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.35);
+  box-shadow: var(--glow-ice), inset 0 1px 0 rgba(0, 212, 255, 0.15);
+}
+
+.tier-zone.active-ember {
+  color: var(--col-ember);
+  background: rgba(255, 140, 0, 0.1);
+  border-color: rgba(255, 140, 0, 0.35);
+  box-shadow: var(--glow-ember), inset 0 1px 0 rgba(255, 140, 0, 0.15);
+}
+
+.tier-zone.active-surge {
+  color: var(--col-surge);
+  background: rgba(255, 45, 110, 0.1);
+  border-color: rgba(255, 45, 110, 0.35);
+  box-shadow: var(--glow-surge), inset 0 1px 0 rgba(255, 45, 110, 0.15);
+}
+
+/* ─── Mode Toggle Switch ─────────────────────────────────────────────── */
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--col-edge);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 0;
+}
+
+.mode-toggle-option {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(148, 163, 184, 0.5);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+
+.mode-toggle-option.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mode-toggle-option:hover:not(.active) {
+  color: rgba(226, 232, 240, 0.75);
+}
+
+/* ─── MIC Button ─────────────────────────────────────────────────────── */
+.mic-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.01em;
+}
+
+.mic-btn:active {
+  transform: scale(0.98) translateY(1px);
+}
+
+.mic-btn-start {
+  background: linear-gradient(135deg, #16a34a, #059669);
+  color: #fff;
+  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.35);
+}
+
+.mic-btn-start:hover {
+  background: linear-gradient(135deg, #15803d, #047857);
+  box-shadow: 0 6px 20px rgba(22, 163, 74, 0.45);
+}
+
+.mic-btn-stop {
+  background: linear-gradient(135deg, #b91c1c, #9f1239);
+  color: #fff;
+  border-color: rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 16px rgba(185, 28, 28, 0.35);
+}
+
+.mic-btn-stop:hover {
+  background: linear-gradient(135deg, #991b1b, #881337);
+}
+
+/* ─── Calibration Overlay ────────────────────────────────────────────── */
+.calibration-step-zone {
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* ─── Reduced Motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .tier-zone.active-ice,
+  .tier-zone.active-ember,
+  .tier-zone.active-surge {
+    box-shadow: none;
+  }
+
+  .led-live,
+  .led-ice,
+  .led-ember,
+  .led-surge {
+    box-shadow: none;
+  }
+}
