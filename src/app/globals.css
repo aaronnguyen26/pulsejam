@@ -270,3 +270,69 @@ body {
     box-shadow: none;
   }
 }
+
+/* ─── DESIGN.md Tokens & Utilities (Stitch Refined Brand System) ────── */
+
+/* Typography Fonts */
+.font-display-lg,
+.font-headline-md,
+.font-headline-sm {
+  font-family: var(--font-eb-garamond), "EB Garamond", Georgia, serif;
+}
+
+.font-body-lg,
+.font-body-md,
+.font-label-caps {
+  font-family: var(--font-hanken-grotesk), "Hanken Grotesk", system-ui, sans-serif;
+}
+
+/* Custom Gradients */
+.bg-gradient-brass {
+  background: linear-gradient(135deg, #f2ca50 0%, #d4af37 100%);
+}
+
+.text-gradient-brass {
+  background: linear-gradient(135deg, #f2ca50 0%, #e7c9a6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glassmorphism & Depth */
+.glass-panel {
+  background: rgba(42, 42, 42, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.border-hairline {
+  border: 1px solid rgba(223, 194, 159, 0.15);
+}
+
+.highlight-top {
+  box-shadow: inset 0 1px 0 rgba(231, 201, 166, 0.2);
+}
+
+/* Floating Animation */
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.animate-float {
+  animation: float-gentle 8s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-gentle 8s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+@keyframes spin-slow-gentle {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-slow {
+  animation: spin-slow-gentle 30s linear infinite;
+}
+

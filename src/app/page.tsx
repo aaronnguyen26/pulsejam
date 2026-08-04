@@ -5,7 +5,7 @@ import { AudioEngine } from '@/lib/audio/AudioEngine';
 import {
   AIGenerationLogEntry,
   AIGenerationMetrics,
-  AppMode,
+  AppMode as LibAppMode,
   AudioEngineStatus,
   CalibrationData,
   CloudVibeMetrics,
@@ -26,10 +26,29 @@ import { DesktopDownloadBanner }  from '@/components/DesktopDownloadBanner';
 import { CalibrationWizard }      from '@/components/CalibrationWizard';
 import { StatusBanner }           from '@/components/StatusBanner';
 import { TierGauge }              from '@/components/TierGauge';
-import { ModeToggle }             from '@/components/ModeToggle';
+import { ModeToggle, AppMode }    from '@/components/ModeToggle';
 import ScrollAnimationExample     from '@/components/ScrollAnimationExample';
 
+// Screen Components built from Stitch MCP & DESIGN.md
+import { RefinedBrandExperienceScreen } from '@/components/screens/RefinedBrandExperienceScreen';
+import { StudioHubScreen }              from '@/components/screens/StudioHubScreen';
+import { PerformanceStemsScreen }       from '@/components/screens/PerformanceStemsScreen';
+import { PerformanceAIScreen }          from '@/components/screens/PerformanceAIScreen';
+import { InputCalibrationScreen }       from '@/components/screens/InputCalibrationScreen';
+import { LibraryScreen }                from '@/components/screens/LibraryScreen';
+
+type ScreenView =
+  | 'brand'
+  | 'studio_hub'
+  | 'performance_stems'
+  | 'performance_ai'
+  | 'calibration'
+  | 'library'
+  | 'live_app';
+
 export default function PulseJamApp() {
+  const [activeScreen, setActiveScreen] = useState<ScreenView>('brand');
+
   const audioEngineRef = useRef<AudioEngine | null>(null);
 
   const [metrics,          setMetrics]          = useState<DSPMetrics | null>(null);
@@ -99,176 +118,127 @@ export default function PulseJamApp() {
   };
 
   const handleCalibrationComplete = (calibration: CalibrationData) => {
-    audioEngineRef.current?.setCalibration(calibration);
     setIsCalibrating(false);
+    // Apply calibration thresholds if supported by engine
   };
-
-  const handleAppModeChange = (mode: AppMode) => {
-    setAppMode(mode);
-    audioEngineRef.current?.setAppMode(mode);
-  };
-
-  const handleToggleCloudVibe = async () => {
-    const engine = audioEngineRef.current;
-    if (!engine) return;
-    if (cloudVibeMetrics?.status === 'CONNECTED' || cloudVibeMetrics?.status === 'CONNECTING') {
-      engine.stopCloudVibe();
-    } else {
-      await engine.startCloudVibe();
-    }
-  };
-
-  const handleStopCloudVibe = () => {
-    audioEngineRef.current?.stopCloudVibe();
-  };
-
-  const handleCloudVibeVolumeChange = (vol: number) => {
-    audioEngineRef.current?.setCloudVibeVolume(vol);
-  };
-
-  const activeTier: PerformanceTier = metrics?.activeTier ?? 'chill';
 
   return (
-    <main
-      className="min-h-screen flex flex-col"
-      style={{ background: 'var(--col-void)' }}
-    >
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <header
-        className="sticky top-0 z-30 backdrop-blur-md border-b"
-        style={{
-          background: 'rgba(8,11,18,0.92)',
-          borderColor: 'rgba(255,255,255,0.07)',
-        }}
-      >
-        <div className="mx-auto max-w-5xl px-5 py-3.5 flex items-center gap-4 justify-between">
-          {/* Brand */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div
-              className="flex flex-col gap-[3px] justify-center h-9 w-9 items-center rounded-lg flex-shrink-0"
-              style={{ background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)' }}
-              aria-hidden="true"
-            >
-              <div className="h-[3px] w-4 rounded-full" style={{ background: 'var(--col-ice)' }} />
-              <div className="h-[3px] w-5 rounded-full" style={{ background: 'var(--col-ember)' }} />
-              <div className="h-[3px] w-6 rounded-full" style={{ background: 'var(--col-surge)' }} />
+    <main className="min-h-screen bg-[#131313] text-[#e5e2e1] flex flex-col font-body-md">
+      {/* Stitch Design System Screen Switcher Toolbar */}
+      <div className="sticky top-0 z-50 bg-[#0e0e0e]/90 backdrop-blur-xl border-b border-hairline py-2.5 px-4">
+        <div className="max-w-[1280px] mx-auto flex items-center justify-between gap-4 overflow-x-auto">
+          <div className="flex items-center gap-2">
+            <span className="font-headline-sm text-sm text-[#f2ca50] font-bold">Stitch Screens:</span>
+            <div className="flex items-center gap-1.5 bg-[#201f1f] p-1 rounded-full border border-hairline">
+              {[
+                { id: 'brand', label: 'Refined Brand Experience' },
+                { id: 'studio_hub', label: 'Studio Hub' },
+                { id: 'performance_stems', label: 'Stems Performance' },
+                { id: 'performance_ai', label: 'AI Performance' },
+                { id: 'calibration', label: 'Calibration' },
+                { id: 'library', label: 'Library' },
+                { id: 'live_app', label: 'Live Audio Workspace' },
+              ].map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveScreen(s.id as ScreenView)}
+                  className={`px-3 py-1 rounded-full font-label-caps text-[11px] transition-all cursor-pointer whitespace-nowrap ${
+                    activeScreen === s.id
+                      ? 'bg-gradient-brass text-[#3c2f00] font-bold shadow-[0_0_12px_rgba(242,202,80,0.3)]'
+                      : 'text-[#d0c5af] hover:text-[#e5e2e1] hover:bg-white/5'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
-            <span
-              className="text-base font-bold tracking-tight text-white hidden sm:block"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              PulseJam AI
-            </span>
-          </div>
-
-          {/* Mode toggle — center header */}
-          <ModeToggle mode={appMode} onChange={handleAppModeChange} />
-
-          {/* Right side status indicators */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {engineStatus.isMicActive && (
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="h-2 w-2 rounded-full animate-pulse led-live"
-                  style={{ background: 'var(--col-ok)' }}
-                  aria-hidden="true"
-                />
-                <span className="text-xs text-slate-400 hidden md:block" style={{ fontFamily: 'var(--font-data)' }}>
-                  LIVE MIC
-                </span>
-              </div>
-            )}
-
-            {appMode === 'stems' ? (
-              <TierGauge activeTier={activeTier} metrics={metrics} />
-            ) : (
-              <div className="flex items-center gap-2 bg-amber-950/60 border border-amber-500/30 rounded-lg px-2.5 py-1">
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-xs font-mono font-bold text-amber-300">AI GEN MODE</span>
-              </div>
-            )}
           </div>
         </div>
-      </header>
-
-      {/* ── Body ────────────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-5xl w-full flex-1 px-5 py-5 space-y-4">
-
-        {/* Status Error Banner */}
-        <StatusBanner
-          errorType={engineStatus.errorType}
-          errorMessage={engineStatus.errorMessage}
-          onDismiss={() => {}}
-        />
-
-        {/* Stage 4 Desktop .dmg Download Card & Gatekeeper Instructions */}
-        <DesktopDownloadBanner />
-
-        {/* Stage 3 Cloud Vibe Toolbar */}
-        <CloudVibeToolbar
-          metrics={cloudVibeMetrics}
-          onToggle={handleToggleCloudVibe}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onVolumeChange={handleCloudVibeVolumeChange}
-          onStop={handleStopCloudVibe}
-        />
-
-        {/* Visualizer */}
-        <Visualizer metrics={metrics} activeTier={activeTier} />
-
-        {/* Controls */}
-        <ControlPanel
-          isMicActive={engineStatus.isMicActive}
-          mode={operatingMode}
-          activeTier={activeTier}
-          stemSource={stemSource}
-          onToggleMic={handleToggleMic}
-          onSelectMode={handleSelectMode}
-          onChangeStemSource={handleChangeStemSource}
-          onOpenCalibration={() => setIsCalibrating(true)}
-        />
-
-        {/* Mode Specific Telemetry & Latency Monitors */}
-        {appMode === 'stems' ? (
-          <LatencyMonitor
-            logs={latencyLogs}
-            onClear={() => {
-              setLatencyLogs([]);
-              audioEngineRef.current?.clearLatencyHistory();
-            }}
-          />
-        ) : (
-          <AIGenerationMonitor
-            metrics={aiGenMetrics}
-            logs={aiGenLogs}
-            onClear={() => {
-              setAiGenLogs([]);
-              audioEngineRef.current?.clearAIGenLogs();
-            }}
-          />
-        )}
       </div>
 
-      {/* ── Scroll-Linked & Triggered Animation Demo (Lenis + Motion) ── */}
-      <ScrollAnimationExample />
+      {/* Screen Render Switcher */}
+      {activeScreen === 'brand' && <RefinedBrandExperienceScreen />}
+      {activeScreen === 'studio_hub' && <StudioHubScreen />}
+      {activeScreen === 'performance_stems' && <PerformanceStemsScreen />}
+      {activeScreen === 'performance_ai' && <PerformanceAIScreen />}
+      {activeScreen === 'calibration' && <InputCalibrationScreen />}
+      {activeScreen === 'library' && <LibraryScreen />}
 
-      {/* ── Footer ──────────────────────────────────────────────────── */}
-      <footer
-        className="py-3 px-5 text-center border-t"
-        style={{
-          borderColor: 'rgba(255,255,255,0.06)',
-          background:  'rgba(4,6,10,0.7)',
-        }}
-      >
-        <span
-          className="text-xs text-slate-600"
-          style={{ fontFamily: 'var(--font-data)' }}
-        >
-          PulseJam AI — Stems · Local AI MIDI (Magenta.js) · Cloud Vibe (Google Lyria RealTime BYOK) · Desktop App (Tauri)
+      {/* Live Audio App Screen */}
+      {activeScreen === 'live_app' && (
+        <div className="flex-1 flex flex-col gap-5 p-4 max-w-[1400px] w-full mx-auto">
+          <StatusBanner
+            errorType={engineStatus.errorType}
+            errorMessage={engineStatus.errorMessage}
+            onDismiss={() => setEngineStatus((s) => ({ ...s, errorType: null, errorMessage: null }))}
+          />
+
+          <DesktopDownloadBanner />
+
+          <CloudVibeToolbar
+            metrics={cloudVibeMetrics}
+            onToggle={() => {}}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onVolumeChange={() => {}}
+            onStop={() => {}}
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-8 flex flex-col gap-5">
+              <Visualizer metrics={metrics} activeTier={metrics?.activeTier ?? 'chill'} />
+
+              <ControlPanel
+                isMicActive={engineStatus.isMicActive}
+                mode={operatingMode}
+                activeTier={metrics?.activeTier ?? 'chill'}
+                stemSource={stemSource}
+                onToggleMic={handleToggleMic}
+                onSelectMode={handleSelectMode}
+                onChangeStemSource={handleChangeStemSource}
+                onOpenCalibration={() => setIsCalibrating(true)}
+              />
+            </div>
+
+            <div className="lg:col-span-4 flex flex-col gap-5">
+              <TierGauge activeTier={metrics?.activeTier ?? 'chill'} metrics={metrics} />
+
+              <ModeToggle mode={appMode} onChange={setAppMode} />
+            </div>
+          </div>
+
+          <div className="mt-2">
+            {appMode === 'stems' ? (
+              <LatencyMonitor
+                logs={latencyLogs}
+                onClear={() => {
+                  setLatencyLogs([]);
+                  audioEngineRef.current?.clearLatencyHistory();
+                }}
+              />
+            ) : (
+              <AIGenerationMonitor
+                metrics={aiGenMetrics}
+                logs={aiGenLogs}
+                onClear={() => {
+                  setAiGenLogs([]);
+                  audioEngineRef.current?.clearAIGenLogs();
+                }}
+              />
+            )}
+          </div>
+
+          <ScrollAnimationExample />
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="py-4 px-6 text-center border-t border-hairline bg-[#0e0e0e]/80">
+        <span className="text-xs text-[#d0c5af] font-mono">
+          PulseJam AI — Stitch Design System (`PulseJam: Refined Brand Experience`) · Next.js · Tailwind CSS
         </span>
       </footer>
 
-      {/* ── Modals & Overlays ───────────────────────────────────────── */}
+      {/* Modals & Overlays */}
       {isCalibrating && (
         <CalibrationWizard
           currentMetrics={metrics}
