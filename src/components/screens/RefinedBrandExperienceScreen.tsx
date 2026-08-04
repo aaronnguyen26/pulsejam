@@ -10,12 +10,12 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
  * Extracted from Stitch MCP screen 'c630a39a9ca245aca7f6f2586b4f0532' ('Pulsejam: Cinematic Narrative Experience')
  * 
  * Features:
- * 1. Pinned/Scroll-Jacked Scenarios Section with GSAP ScrollTrigger:
- *    - Pinned in place when reaching the top of the viewport.
- *    - Scroll input drives left-to-right horizontal state transitions (Practice → Growth → Performance).
- *    - Unpins ONLY once Performance card is reached.
- *    - Zero dead space: transitions directly into #security ("Your Music, Your Privacy").
- *    - Properly synced with Lenis smooth scroll and cleaned up via gsap.context revert.
+ * 1. Pinned Scenarios Section with GSAP ScrollTrigger & Snap:
+ *    - Pinned in place at top top with top padding clearing the fixed navbar so 'Everyday Jams' is 100% visible.
+ *    - Snapping (snapTo: [0, 0.5, 1]) prevents half-and-half card positions.
+ *    - Scroll input drives left-to-right state transitions (Practice → Growth → Performance).
+ *    - Unpins ONLY once Performance card is reached, transitioning straight into #security with 0 dead space.
+ * 2. Synced with Lenis smooth scroll and cleaned up via gsap.context revert.
  */
 export const RefinedBrandExperienceScreen: React.FC = () => {
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -44,6 +44,12 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
           start: 'top top',
           end: '+=200%', // 200% scroll distance for 3 panels
           scrub: 0.5,
+          snap: {
+            snapTo: [0, 0.5, 1], // Snap 100% cleanly to Practice (0), Growth (0.5), or Performance (1.0)
+            duration: { min: 0.25, max: 0.45 },
+            delay: 0.08,
+            ease: 'power1.inOut',
+          },
           anticipatePin: 1,
           onUpdate: (self) => {
             const p = self.progress;
@@ -76,7 +82,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
       {/* Atmospheric Top Background Gradient */}
       <div className="fixed top-0 inset-x-0 h-64 bg-gradient-to-b from-[#131313] via-[#131313]/80 to-transparent -z-10 pointer-events-none" />
 
-      {/* ── Top Navigation ───────────────────────────────────────────── */}
+      {/* ── Top Navigation (h-24 = 96px fixed top navbar) ────────────── */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#131313]/80 backdrop-blur-2xl border-b border-[#e7c9a6]/10 transition-all duration-300">
         <div className="flex justify-between items-center h-24 px-6 md:px-12 max-w-[1280px] mx-auto">
           <a href="#" className="font-headline-sm text-2xl text-[#f2ca50] tracking-tight flex items-center gap-2 group font-bold">
@@ -393,7 +399,8 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
 
         {/* ── Section 3: GSAP SCROLLTRIGGER PINNED SCENARIOS SECTION ──── */}
         <section id="stories" ref={scenariosRef} className="h-screen w-full relative border-t border-hairline bg-[#131313] overflow-hidden">
-          <div className="w-full h-full flex flex-col justify-between p-6 md:p-10 relative z-10">
+          {/* Top padding (pt-28 md:pt-32) clears the h-24 fixed top navbar so 'Everyday Jams' is 100% visible */}
+          <div className="w-full h-full flex flex-col justify-between pt-28 md:pt-32 pb-8 px-6 md:px-12 relative z-10">
             {/* Ambient Backdrops */}
             <div className="absolute inset-0 pointer-events-none -z-10">
               <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-[#f2ca50]/5 rounded-full blur-[160px]" />
@@ -401,29 +408,29 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
             </div>
 
             {/* Header Stage Selector Bar */}
-            <div className="max-w-[1280px] mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-4 pt-2 z-20">
+            <div className="max-w-[1280px] mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-4 z-20">
               <div>
                 <span className="font-label-caps text-xs text-[#e7c9a6] uppercase tracking-widest block mb-1">
                   Scenarios
                 </span>
-                <h2 className="font-headline-md text-3xl md:text-4xl text-[#e5e2e1]">Everyday Jams</h2>
+                <h2 className="font-headline-md text-3xl md:text-5xl text-[#e5e2e1] font-normal tracking-tight">Everyday Jams</h2>
               </div>
 
               {/* Dynamic Stage Pill Highlights */}
-              <div className="flex items-center gap-3 bg-[#201f1f] px-4 py-2 rounded-full border border-hairline shadow-inner">
-                <span className={`font-label-caps text-xs px-3 py-1 rounded-full transition-all duration-300 ${
+              <div className="flex items-center gap-3 bg-[#201f1f] px-5 py-2.5 rounded-full border border-hairline shadow-inner">
+                <span className={`font-label-caps text-xs px-3.5 py-1 rounded-full transition-all duration-300 ${
                   activeIndex === 0 ? 'text-[#f2ca50] bg-[#f2ca50]/15 font-bold border border-[#f2ca50]/40' : 'text-[#d0c5af]/60'
                 }`}>
                   01 PRACTICE
                 </span>
                 <span className="text-[#e7c9a6]/40">•</span>
-                <span className={`font-label-caps text-xs px-3 py-1 rounded-full transition-all duration-300 ${
+                <span className={`font-label-caps text-xs px-3.5 py-1 rounded-full transition-all duration-300 ${
                   activeIndex === 1 ? 'text-[#f2ca50] bg-[#f2ca50]/15 font-bold border border-[#f2ca50]/40' : 'text-[#d0c5af]/60'
                 }`}>
                   02 GROWTH
                 </span>
                 <span className="text-[#e7c9a6]/40">•</span>
-                <span className={`font-label-caps text-xs px-3 py-1 rounded-full transition-all duration-300 ${
+                <span className={`font-label-caps text-xs px-3.5 py-1 rounded-full transition-all duration-300 ${
                   activeIndex === 2 ? 'text-[#f2ca50] bg-[#f2ca50]/15 font-bold border border-[#f2ca50]/40' : 'text-[#d0c5af]/60'
                 }`}>
                   03 PERFORMANCE
@@ -437,16 +444,16 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               </div>
             </div>
 
-            {/* Horizontal Track Canvas: Scrubbed via GSAP ScrollTrigger (0% -> -66.666%) */}
+            {/* Horizontal Track Canvas: Scrubbed & Snapped via GSAP ScrollTrigger (0% -> -66.666%) */}
             <div className="w-full flex-1 flex items-center overflow-hidden relative my-auto">
               <div
                 ref={trackRef}
                 className="flex flex-row w-[300%] h-full items-center shrink-0"
               >
                 {/* ── PANEL 1: PRACTICE ── */}
-                <div className="w-1/3 h-full px-4 md:px-12 flex items-center justify-center shrink-0">
+                <div className="w-1/3 h-full px-4 md:px-8 flex items-center justify-center shrink-0">
                   <div className="max-w-[1280px] w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-                    <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-3xl border border-hairline p-8 md:p-12 relative overflow-hidden flex flex-col justify-end min-h-[380px] md:min-h-[460px] shadow-2xl group">
+                    <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-3xl border border-hairline p-8 md:p-12 relative overflow-hidden flex flex-col justify-end min-h-[360px] md:min-h-[440px] shadow-2xl group">
                       <div
                         className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-50 group-hover:opacity-75 transition-opacity duration-700 group-hover:scale-105"
                         style={{ backgroundImage: "url('/images/living_room_jam.jpg')" }}
@@ -467,7 +474,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                     <div className="md:col-span-5 glass-panel border border-hairline rounded-3xl p-8 md:p-10 highlight-top shadow-2xl space-y-4">
                       <div className="font-label-caps text-xs text-[#f2ca50] tracking-widest">SCENARIO 01 · PRACTICE</div>
                       <h4 className="font-headline-sm text-2xl text-[#e5e2e1]">Intimate Solo Jam</h4>
-                      <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed mb-4">
+                      <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed">
                         Focus on the dynamic interaction between acoustic guitar riffs and responsive backing stem layers.
                       </p>
                     </div>
@@ -475,7 +482,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 </div>
 
                 {/* ── PANEL 2: GROWTH ── */}
-                <div className="w-1/3 h-full px-4 md:px-12 flex items-center justify-center shrink-0">
+                <div className="w-1/3 h-full px-4 md:px-8 flex items-center justify-center shrink-0">
                   <div className="max-w-[1280px] w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
                     <div className="md:col-span-6 glass-panel border border-hairline rounded-3xl p-8 md:p-12 highlight-top shadow-2xl space-y-6">
                       <span className="font-label-caps text-xs text-[#e7c9a6] border border-[#4d4635] rounded-full px-4 py-1.5 inline-block bg-[#131313]/70">
@@ -519,9 +526,9 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 </div>
 
                 {/* ── PANEL 3: PERFORMANCE ── */}
-                <div className="w-1/3 h-full px-4 md:px-12 flex items-center justify-center shrink-0">
+                <div className="w-1/3 h-full px-4 md:px-8 flex items-center justify-center shrink-0">
                   <div className="max-w-[1280px] w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-                    <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-3xl border border-hairline p-8 md:p-12 relative overflow-hidden flex flex-col justify-end min-h-[380px] md:min-h-[460px] shadow-2xl group">
+                    <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-3xl border border-hairline p-8 md:p-12 relative overflow-hidden flex flex-col justify-end min-h-[360px] md:min-h-[440px] shadow-2xl group">
                       <div
                         className="absolute inset-0 bg-cover bg-center opacity-60 mix-blend-luminosity group-hover:opacity-80 transition-opacity duration-700 group-hover:scale-105"
                         style={{ backgroundImage: "url('/images/scenario_performance.jpg')" }}
