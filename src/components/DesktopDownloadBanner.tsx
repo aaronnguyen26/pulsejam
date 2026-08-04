@@ -50,9 +50,8 @@ export const DesktopDownloadBanner: React.FC = () => {
           </button>
 
           <a
-            href="https://github.com/aaronnguyen26/pulsejam/releases/latest"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/downloads/PulseJam_0.1.0_aarch64.dmg"
+            download="PulseJam_0.1.0_aarch64.dmg"
             className="px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-bold font-mono text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition cursor-pointer"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -93,7 +92,7 @@ export const DesktopDownloadBanner: React.FC = () => {
           </p>
 
           <ol className="list-decimal list-inside space-y-1.5 font-mono text-slate-300 bg-black/40 rounded-xl p-3 border border-white/5">
-            <li>Open the downloaded <code className="text-cyan-300">PulseJam_0.1.0_x64.dmg</code> installer and drag <strong>PulseJam.app</strong> to your <strong>Applications</strong> folder.</li>
+            <li>Open the downloaded <code className="text-cyan-300">PulseJam_0.1.0_aarch64.dmg</code> installer and drag <strong>PulseJam.app</strong> to your <strong>Applications</strong> folder.</li>
             <li>In Applications, <strong>Right-Click</strong> (or Control-Click) <strong>PulseJam.app</strong> and click <strong>Open</strong> from the contextual menu.</li>
             <li>Click <strong>Open</strong> in the confirmation dialog. *(This one-time step bypasses Gatekeeper for all future double-click launches).*</li>
           </ol>
