@@ -22,10 +22,12 @@ import { LatencyMonitor }         from '@/components/LatencyMonitor';
 import { AIGenerationMonitor }    from '@/components/AIGenerationMonitor';
 import { CloudVibeToolbar }       from '@/components/CloudVibeToolbar';
 import { CloudVibeSettingsModal } from '@/components/CloudVibeSettingsModal';
+import { DesktopDownloadBanner }  from '@/components/DesktopDownloadBanner';
 import { CalibrationWizard }      from '@/components/CalibrationWizard';
 import { StatusBanner }           from '@/components/StatusBanner';
 import { TierGauge }              from '@/components/TierGauge';
 import { ModeToggle }             from '@/components/ModeToggle';
+import ScrollAnimationExample     from '@/components/ScrollAnimationExample';
 
 export default function PulseJamApp() {
   const audioEngineRef = useRef<AudioEngine | null>(null);
@@ -199,6 +201,9 @@ export default function PulseJamApp() {
           onDismiss={() => {}}
         />
 
+        {/* Stage 4 Desktop .dmg Download Card & Gatekeeper Instructions */}
+        <DesktopDownloadBanner />
+
         {/* Stage 3 Cloud Vibe Toolbar */}
         <CloudVibeToolbar
           metrics={cloudVibeMetrics}
@@ -244,6 +249,9 @@ export default function PulseJamApp() {
         )}
       </div>
 
+      {/* ── Scroll-Linked & Triggered Animation Demo (Lenis + Motion) ── */}
+      <ScrollAnimationExample />
+
       {/* ── Footer ──────────────────────────────────────────────────── */}
       <footer
         className="py-3 px-5 text-center border-t"
@@ -256,7 +264,7 @@ export default function PulseJamApp() {
           className="text-xs text-slate-600"
           style={{ fontFamily: 'var(--font-data)' }}
         >
-          PulseJam AI — Stems · Local AI MIDI (Magenta.js) · Cloud Vibe (Google Lyria RealTime BYOK)
+          PulseJam AI — Stems · Local AI MIDI (Magenta.js) · Cloud Vibe (Google Lyria RealTime BYOK) · Desktop App (Tauri)
         </span>
       </footer>
 

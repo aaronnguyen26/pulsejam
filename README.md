@@ -1,47 +1,93 @@
-# PulseJam AI — Complete Stage 1, Stage 2 & Stage 3 Client-Side AI Companion
+# PulseJam AI — Complete Stage 1, Stage 2, Stage 3 & Stage 4 Desktop Companion
 
 PulseJam AI is a 100% client-side, zero-backend Next.js application that listens to live instrument input via microphone and dynamically accompanies the player in real-time.
 
-It features three integrated layers:
+It features four integrated layers & targets:
 1. **Stems Mode (Stage 1)**: Dynamically crossfades between 3 tiers of backing-track stems (**Chill / Groove / Peak**) based on playing volume and attack density.
 2. **AI Generation Mode (Stage 2)**: Runs real-time YIN monophonic pitch detection in AudioWorklet, feeds discrete MIDI note sequences to a dedicated Web Worker running **Magenta.js** (`@magenta/music` with TensorFlow.js WASM backend), and generates 1-bar lookahead drum + bass/melody accompaniment.
 3. **Cloud "Vibe" Layer (Stage 3)**: An optional, slow-morphing generative ambient/textural overlay powered by Google's **Lyria RealTime model** (`models/lyria-realtime-exp`), driven by live playing telemetry. 100% **Bring Your Own Key (BYOK)**.
+4. **Standalone macOS Desktop App (Stage 4)**: Tauri-wrapped native macOS application (`.dmg` installer) generated from the same single codebase.
 
 ---
 
 ## 🚀 Key Features & Architecture
 
-- **Zero-Backend & Static Export**: 100% client-side WebAudio DSP, local WASM AI inference, and browser-direct WebSockets. Deployable to Vercel free tier or any static host.
+- **Zero-Backend & Static Export**: 100% client-side WebAudio DSP, local WASM AI inference, and browser-direct WebSockets. Deployable to Vercel free tier or as a native desktop app.
 - **AudioWorklet DSP & Pitch Detection**: RMS dB extraction, peak onset detection, YIN monophonic pitch detection, EMA smoothing, and hysteresis dwell logic run entirely in `AudioWorkletProcessor` (`public/worklets/dsp-processor.js`).
 - **Local AI Web Worker**: Web Worker (`public/workers/magenta-worker.js`) running TensorFlow.js with WASM backend (`@tensorflow/tfjs-backend-wasm`) offloading DrumsRNN and MelodyRNN inference off main and audio threads.
 - **Cloud Vibe Layer (Google Lyria RealTime, BYOK)**:
   - **BYOK Architecture**: Google AI Studio API key stored exclusively in browser `localStorage`.
-  - **Telemetry-to-Prompt Mapping**: Maps volume, attack density, active tier, and detected pitch to weighted text prompts and continuous `density` / `brightness` parameters every 3 seconds.
   - **9-Minute Seamless Session Rotation**: Automatically connects a secondary WebSocket at 9 minutes (540s), pre-buffers 48kHz stereo PCM audio, smoothly crossfades over 500ms, and closes the old session to stay under Google's 10-minute cap without dropouts.
   - **Emergency Stop & Billing Safeguards**: Visible **"Cloud Vibe: Connected"** status pill, live session timer, dedicated volume slider, and an unmistakable red **[STOP CLOUD VIBE]** emergency button.
+- **Tauri macOS Desktop App (Stage 4)**:
+  - Native WKWebView wrapper configured with `NSMicrophoneUsageDescription` permission and WebSocket CSP allowlist (`wss://generativelanguage.googleapis.com`).
+  - Intentionally unsigned `.dmg` build target.
 
 ---
 
-## 🛠️ Getting Started
+## 🛠️ Build Targets (Single Codebase)
 
-### Prerequisites
-- Node.js 18+ and `npm`
-
-### Installation & Development Server
+### 1. Web App Build Target (Vercel)
 ```bash
-# 1. Install dependencies
+# Install dependencies
 npm install
 
-# 2. Run local dev server
+# Run local web dev server
 npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your web browser.
 
-### Static Export Build
-```bash
+# Static export build (generates out/ directory)
 npm run build
 ```
-The static export bundle will be generated in the `out/` directory, ready for deployment on static hosting.
+
+### 2. Standalone macOS Desktop App Build Target (Tauri)
+```bash
+# Run Tauri in dev mode (interactive desktop app window)
+npm run tauri:dev
+
+# Build production unsigned macOS .dmg installer
+npm run tauri:build
+```
+The output `.dmg` installer will be generated in `src-tauri/target/release/bundle/dmg/PulseJam_0.1.0_x64.dmg`.
+
+---
+
+##  Stage 4 Desktop App & Gatekeeper Guidance
+
+### 1. Native macOS Microphone Permission Manifest
+Microphone usage is declared in `src-tauri/tauri.conf.json`:
+```json
+{
+  "bundle": {
+    "macOS": {
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "PulseJam listens to your live instrument playing to dynamically crossfade backing stems and generate AI accompaniment in real time."
+      }
+    }
+  }
+}
+```
+
+### 2. Network CSP Allowlist for Stage 3 Cloud Layer
+Tauri Content Security Policy allows direct WebSocket streaming:
+```
+connect-src 'self' wss://generativelanguage.googleapis.com https://storage.googleapis.com https://cdn.jsdelivr.net blob: data:;
+```
+
+### 3. Unsigned Build Gatekeeper Bypass Instructions
+> [!IMPORTANT]
+> **First-Time macOS Launch (Unsigned Build)**:
+> Because this standalone desktop app is intentionally built unsigned (avoiding annual developer subscription fees), macOS Gatekeeper will block double-clicking on first launch ("PulseJam can't be opened because it is from an unidentified developer").
+>
+> **How to bypass Gatekeeper on first launch**:
+> 1. Drag **PulseJam.app** from the `.dmg` into your **Applications** folder.
+> 2. In Applications, **Right-Click** (or Control-Click) **PulseJam.app** and select **Open**.
+> 3. Click **Open** in the confirmation dialog. *(This one-time step authorizes the app for all future double-click launches).*
+
+### 4. Code Signing & Notarization Roadmap (Optional)
+If you decide to sign and notarize the desktop app in the future:
+1. Join the Apple Developer Program ($99/yr).
+2. Export your Developer ID Application certificate.
+3. Configure `APPLE_SIGNING_IDENTITY` and `APPLE_NOTARIZATION_USERNAME` / `APPLE_NOTARIZATION_PASSWORD` in Tauri's environment configuration.
 
 ---
 
