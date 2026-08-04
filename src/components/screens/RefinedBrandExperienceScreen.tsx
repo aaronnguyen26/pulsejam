@@ -10,12 +10,15 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
  * Extracted from Stitch MCP screen 'c630a39a9ca245aca7f6f2586b4f0532' ('Pulsejam: Cinematic Narrative Experience')
  * 
  * Features:
- * 1. Pinned Scenarios Section with GSAP ScrollTrigger & Snap:
- *    - Pinned in place at top top with top padding clearing the fixed navbar so 'Everyday Jams' is 100% visible.
+ * 1. Process Section:
+ *    - Active breathing & glowing hover-style animations for all 3 step images (Step 01, Step 02, Step 03)
+ *      triggered automatically when scrolled into view without requiring mouse hover.
+ *    - Glowing animated SVG path line that lights up and sends traveling energy pulses down the line on scroll.
+ * 2. Pinned Scenarios Section with GSAP ScrollTrigger & Snap:
+ *    - Pinned in place at top top with top padding clearing fixed navbar.
  *    - Snapping (snapTo: [0, 0.5, 1]) prevents half-and-half card positions.
  *    - Scroll input drives left-to-right state transitions (Practice → Growth → Performance).
  *    - Unpins ONLY once Performance card is reached, transitioning straight into #security with 0 dead space.
- * 2. Synced with Lenis smooth scroll and cleaned up via gsap.context revert.
  */
 export const RefinedBrandExperienceScreen: React.FC = () => {
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -262,61 +265,118 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
           </div>
 
           <div className="px-6 md:px-12 max-w-[1000px] mx-auto relative z-10">
-            {/* Animated SVG Connecting Path */}
+            {/* Animated & Glowing SVG Connecting Path */}
             <svg
               className="hidden md:block absolute top-24 left-1/2 -translate-x-1/2 w-[800px] h-[500px] pointer-events-none z-0"
               fill="none"
               viewBox="0 0 800 500"
             >
+              {/* Outer Glowing Backlight Path */}
+              <motion.path
+                d="M 100 0 C 100 200, 700 100, 700 300 C 700 400, 400 450, 400 500"
+                stroke="url(#paint_narrative_line_glow)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                className="blur-md"
+                initial={{ pathLength: 0, opacity: 0.2 }}
+                whileInView={{ pathLength: 1, opacity: [0.3, 0.8, 0.4] }}
+                viewport={{ once: false, margin: '-50px' }}
+                transition={{
+                  pathLength: { duration: 2.5, ease: 'easeInOut' },
+                  opacity: { duration: 3, repeat: Infinity, ease: 'easeInOut' },
+                }}
+              />
+
+              {/* Main Crisp Gold Dashed Path */}
               <motion.path
                 d="M 100 0 C 100 200, 700 100, 700 300 C 700 400, 400 450, 400 500"
                 stroke="url(#paint_narrative_line)"
                 strokeDasharray="8 8"
-                strokeWidth="2.5"
+                strokeWidth="3"
                 initial={{ pathLength: 0 }}
                 whileInView={{ pathLength: 1 }}
-                viewport={{ once: true }}
+                viewport={{ once: false, margin: '-50px' }}
                 transition={{ duration: 2.5, ease: 'easeInOut' }}
               />
+
+              {/* Traveling Glowing Light Pulse Segment */}
+              <motion.path
+                d="M 100 0 C 100 200, 700 100, 700 300 C 700 400, 400 450, 400 500"
+                stroke="#ffe088"
+                strokeDasharray="40 300"
+                strokeWidth="4"
+                strokeLinecap="round"
+                initial={{ strokeDashoffset: 340, opacity: 0 }}
+                whileInView={{
+                  strokeDashoffset: [340, 0],
+                  opacity: [0, 1, 0],
+                }}
+                viewport={{ once: false, margin: '-50px' }}
+                transition={{
+                  duration: 3.5,
+                  repeat: Infinity,
+                  ease: 'linear',
+                }}
+              />
+
               <defs>
                 <linearGradient id="paint_narrative_line" x1="100" y1="0" x2="400" y2="500" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#f2ca50" stopOpacity="0.1" />
-                  <stop offset="0.5" stopColor="#f2ca50" stopOpacity="0.6" />
-                  <stop offset="1" stopColor="#f2ca50" stopOpacity="0.1" />
+                  <stop stopColor="#f2ca50" stopOpacity="0.4" />
+                  <stop offset="0.5" stopColor="#ffe088" stopOpacity="0.9" />
+                  <stop offset="1" stopColor="#f2ca50" stopOpacity="0.4" />
+                </linearGradient>
+                <linearGradient id="paint_narrative_line_glow" x1="100" y1="0" x2="400" y2="500" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#f2ca50" stopOpacity="0.3" />
+                  <stop offset="0.5" stopColor="#ffe088" stopOpacity="0.8" />
+                  <stop offset="1" stopColor="#f2ca50" stopOpacity="0.3" />
                 </linearGradient>
               </defs>
             </svg>
 
-            {/* 3 Steps with Authentic Cinematic Images */}
+            {/* 3 Steps with Active Breathing & Hover-Style Image Animations */}
             <div className="flex flex-col space-y-24 md:space-y-40 relative z-10">
               {/* Step 1: Plug In */}
               <motion.div
                 initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-50px' }}
+                viewport={{ once: false, margin: '-50px' }}
                 transition={{ duration: 0.8, ease: [0.215, 0.61, 0.355, 1] }}
                 className="flex flex-col md:flex-row items-center gap-12 md:gap-24"
               >
                 <div className="w-full md:w-1/2 flex justify-center md:justify-end">
                   <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/30 overflow-hidden relative group shadow-[0_0_40px_rgba(242,202,80,0.2)]"
+                    whileInView={{
+                      scale: [1, 1.06, 1],
+                      boxShadow: [
+                        '0 0 30px rgba(242,202,80,0.25)',
+                        '0 0 55px rgba(242,202,80,0.5)',
+                        '0 0 35px rgba(242,202,80,0.3)',
+                      ],
+                    }}
+                    viewport={{ once: false, margin: '-50px' }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/40 overflow-hidden relative group"
                   >
-                    <div
-                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                    <motion.div
+                      whileInView={{
+                        scale: [1, 1.12, 1],
+                        opacity: [0.75, 1, 0.85],
+                      }}
+                      viewport={{ once: false, margin: '-50px' }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity"
                       style={{ backgroundImage: "url('/images/process_step1.jpg')" }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
                     <div className="absolute bottom-4 inset-x-0 text-center">
-                      <span className="font-label-caps text-[10px] text-[#f2ca50] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline">
+                      <span className="font-label-caps text-[10px] text-[#f2ca50] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline shadow-md">
                         Audio Input
                       </span>
                     </div>
                   </motion.div>
                 </div>
                 <div className="w-full md:w-1/2 text-center md:text-left">
-                  <span className="font-label-caps text-[#f2ca50] tracking-widest text-sm mb-3 block">STEP 01</span>
+                  <span className="font-label-caps text-[#f2ca50] tracking-widest text-sm mb-3 block font-bold">STEP 01</span>
                   <h3 className="font-headline-sm text-3xl md:text-4xl text-[#e5e2e1] mb-4">Plug In</h3>
                   <p className="font-body-md text-[#d0c5af] text-lg leading-relaxed">
                     Connect your instrument or microphone directly to your device. No complex routing required.
@@ -328,30 +388,44 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               <motion.div
                 initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-50px' }}
+                viewport={{ once: false, margin: '-50px' }}
                 transition={{ duration: 0.8, delay: 0.15, ease: [0.215, 0.61, 0.355, 1] }}
                 className="flex flex-col md:flex-row-reverse items-center gap-12 md:gap-24"
               >
                 <div className="w-full md:w-1/2 flex justify-center md:justify-start">
                   <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/30 overflow-hidden relative group shadow-[0_0_40px_rgba(231,201,166,0.2)]"
+                    whileInView={{
+                      scale: [1, 1.06, 1],
+                      boxShadow: [
+                        '0 0 30px rgba(231,201,166,0.25)',
+                        '0 0 55px rgba(231,201,166,0.5)',
+                        '0 0 35px rgba(231,201,166,0.3)',
+                      ],
+                    }}
+                    viewport={{ once: false, margin: '-50px' }}
+                    transition={{ duration: 3, delay: 0.6, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/40 overflow-hidden relative group"
                   >
-                    <div
-                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                    <motion.div
+                      whileInView={{
+                        scale: [1, 1.12, 1],
+                        opacity: [0.75, 1, 0.85],
+                      }}
+                      viewport={{ once: false, margin: '-50px' }}
+                      transition={{ duration: 3, delay: 0.6, repeat: Infinity, ease: 'easeInOut' }}
+                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity"
                       style={{ backgroundImage: "url('/images/process_step2.jpg')" }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
                     <div className="absolute bottom-4 inset-x-0 text-center">
-                      <span className="font-label-caps text-[10px] text-[#e7c9a6] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline">
+                      <span className="font-label-caps text-[10px] text-[#e7c9a6] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline shadow-md">
                         Live Pitch & Tempo
                       </span>
                     </div>
                   </motion.div>
                 </div>
                 <div className="w-full md:w-1/2 text-center md:text-right">
-                  <span className="font-label-caps text-[#e7c9a6] tracking-widest text-sm mb-3 block">STEP 02</span>
+                  <span className="font-label-caps text-[#e7c9a6] tracking-widest text-sm mb-3 block font-bold">STEP 02</span>
                   <h3 className="font-headline-sm text-3xl md:text-4xl text-[#e5e2e1] mb-4">Play Naturally</h3>
                   <p className="font-body-md text-[#d0c5af] text-lg leading-relaxed">
                     Just start playing. The engine instantly detects key, tempo, and dynamic intensity.
@@ -363,30 +437,44 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               <motion.div
                 initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-50px' }}
+                viewport={{ once: false, margin: '-50px' }}
                 transition={{ duration: 0.8, delay: 0.3, ease: [0.215, 0.61, 0.355, 1] }}
                 className="flex flex-col md:flex-row items-center gap-12 md:gap-24"
               >
                 <div className="w-full md:w-1/2 flex justify-center md:justify-end">
                   <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/30 overflow-hidden relative group shadow-[0_0_40px_rgba(212,175,55,0.2)]"
+                    whileInView={{
+                      scale: [1, 1.06, 1],
+                      boxShadow: [
+                        '0 0 30px rgba(212,175,55,0.25)',
+                        '0 0 55px rgba(212,175,55,0.5)',
+                        '0 0 35px rgba(212,175,55,0.3)',
+                      ],
+                    }}
+                    viewport={{ once: false, margin: '-50px' }}
+                    transition={{ duration: 3, delay: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/40 overflow-hidden relative group"
                   >
-                    <div
-                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                    <motion.div
+                      whileInView={{
+                        scale: [1, 1.12, 1],
+                        opacity: [0.75, 1, 0.85],
+                      }}
+                      viewport={{ once: false, margin: '-50px' }}
+                      transition={{ duration: 3, delay: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity"
                       style={{ backgroundImage: "url('/images/process_step3.jpg')" }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
                     <div className="absolute bottom-4 inset-x-0 text-center">
-                      <span className="font-label-caps text-[10px] text-[#d4af37] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline">
+                      <span className="font-label-caps text-[10px] text-[#d4af37] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline shadow-md">
                         AI Companion Stems
                       </span>
                     </div>
                   </motion.div>
                 </div>
                 <div className="w-full md:w-1/2 text-center md:text-left">
-                  <span className="font-label-caps text-[#d4af37] tracking-widest text-sm mb-3 block">STEP 03</span>
+                  <span className="font-label-caps text-[#d4af37] tracking-widest text-sm mb-3 block font-bold">STEP 03</span>
                   <h3 className="font-headline-sm text-3xl md:text-4xl text-[#e5e2e1] mb-4">The App Reacts</h3>
                   <p className="font-body-md text-[#d0c5af] text-lg leading-relaxed">
                     Experience a backing track that ebbs and flows with your performance, creating a unique jam every time.
@@ -510,7 +598,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                       <div className="space-y-4 bg-[#131313]/80 p-6 rounded-2xl border border-hairline">
                         <div className="flex justify-between items-center font-label-caps text-xs text-[#d0c5af]">
                           <span>Complexity Control</span>
-                          <span className="text-[#f2ca50] font-bold">{complexity}% Advanced</span>
+                          <span className="text-[#f2ca50] font-[#f2ca50] font-bold">{complexity}% Advanced</span>
                         </div>
                         <input
                           type="range"
