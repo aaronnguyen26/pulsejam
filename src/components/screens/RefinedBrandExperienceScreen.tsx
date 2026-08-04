@@ -8,21 +8,24 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 /**
  * Screen Component: PulseJam Cinematic Narrative Experience
  * Extracted from Stitch MCP screen 'c630a39a9ca245aca7f6f2586b4f0532' ('Pulsejam: Cinematic Narrative Experience')
+ * & '460259fbe0894953a9a6b1e0f2d2b5ef' ('Pulsejam: Dynamic Security Experience')
  * 
  * Features:
  * 1. Process Section:
- *    - Active breathing & glowing hover-style animations for all 3 step images (Step 01, Step 02, Step 03)
- *      triggered automatically when scrolled into view without requiring mouse hover.
- *    - Glowing animated SVG path line that lights up and sends traveling energy pulses down the line on scroll.
- * 2. Pinned Scenarios Section with GSAP ScrollTrigger & Snap:
- *    - Pinned in place at top top with top padding clearing fixed navbar.
- *    - Snapping (snapTo: [0, 0.5, 1]) prevents half-and-half card positions.
- *    - Scroll input drives left-to-right state transitions (Practice → Growth → Performance).
- *    - Unpins ONLY once Performance card is reached, transitioning straight into #security with 0 dead space.
+ *    - Scroll-driven step glow (Step 01 → 02 → 03) active ONLY while scrolling through the section in order.
+ *    - Works bidirectionally (scrolling down: 01 → 02 → 03, scrolling up: 03 → 02 → 01).
+ *    - When static / idle or out of view, images return to clean static state with 0 glow.
+ *    - Glowing animated SVG path line with energy pulse.
+ * 2. Scenarios Section:
+ *    - Growth card uses authentic guitar fretboard image extracted from 'Pulsejam: Dynamic Security Experience'.
+ *    - GSAP ScrollTrigger pinned horizontal scroll-jack with snap to 100% full view.
  */
 export const RefinedBrandExperienceScreen: React.FC = () => {
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [complexity, setComplexity] = useState(75);
+
+  // Process Section ScrollTrigger State (0 = Step 1, 1 = Step 2, 2 = Step 3, -1 = None)
+  const processRef = useRef<HTMLDivElement>(null);
+  const [activeProcessStep, setActiveProcessStep] = useState<number>(-1);
 
   // GSAP ScrollTrigger references for Scenarios Pinned Section
   const scenariosRef = useRef<HTMLDivElement>(null);
@@ -35,45 +38,69 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
 
     const section = scenariosRef.current;
     const track = trackRef.current;
-
-    if (!section || !track) return;
+    const processSec = processRef.current;
 
     // Use GSAP Context for scope safety and clean unmount cleanup
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: section,
-          pin: true,
-          start: 'top top',
-          end: '+=200%', // 200% scroll distance for 3 panels
-          scrub: 0.5,
-          snap: {
-            snapTo: [0, 0.5, 1], // Snap 100% cleanly to Practice (0), Growth (0.5), or Performance (1.0)
-            duration: { min: 0.25, max: 0.45 },
-            delay: 0.08,
-            ease: 'power1.inOut',
-          },
-          anticipatePin: 1,
+      // 1. Process Section ScrollTrigger: highlights Step 01 -> 02 -> 03 in order (and reverse)
+      if (processSec) {
+        ScrollTrigger.create({
+          trigger: processSec,
+          start: 'top 70%',
+          end: 'bottom 20%',
+          scrub: 0.3,
           onUpdate: (self) => {
             const p = self.progress;
-            setProgressVal(p);
-            if (p < 0.33) {
-              setActiveIndex(0);
-            } else if (p < 0.66) {
-              setActiveIndex(1);
+            if (p < 0.35) {
+              setActiveProcessStep(0);
+            } else if (p < 0.7) {
+              setActiveProcessStep(1);
             } else {
-              setActiveIndex(2);
+              setActiveProcessStep(2);
             }
           },
-        },
-      });
+          onLeave: () => setActiveProcessStep(-1),
+          onLeaveBack: () => setActiveProcessStep(-1),
+        });
+      }
 
-      // Scrub horizontal track from 0% to -66.666%
-      tl.to(track, {
-        xPercent: -66.666,
-        ease: 'none',
-      });
-    }, scenariosRef);
+      // 2. Scenarios Horizontal Scroll-Jack
+      if (section && track) {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: section,
+            pin: true,
+            start: 'top top',
+            end: '+=200%', // 200% scroll distance for 3 panels
+            scrub: 0.5,
+            snap: {
+              snapTo: [0, 0.5, 1], // Snap 100% cleanly to Practice (0), Growth (0.5), or Performance (1.0)
+              duration: { min: 0.25, max: 0.45 },
+              delay: 0.08,
+              ease: 'power1.inOut',
+            },
+            anticipatePin: 1,
+            onUpdate: (self) => {
+              const p = self.progress;
+              setProgressVal(p);
+              if (p < 0.33) {
+                setActiveIndex(0);
+              } else if (p < 0.66) {
+                setActiveIndex(1);
+              } else {
+                setActiveIndex(2);
+              }
+            },
+          },
+        });
+
+        // Scrub horizontal track from 0% to -66.666%
+        tl.to(track, {
+          xPercent: -66.666,
+          ease: 'none',
+        });
+      }
+    });
 
     return () => {
       ctx.revert();
@@ -258,7 +285,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
         </section>
 
         {/* ── Section 2: Cinematic Narrative Experience - The Process ── */}
-        <section id="experience" className="py-32 relative bg-[#0e0e0e]/60 border-t border-hairline overflow-hidden">
+        <section id="experience" ref={processRef} className="py-32 relative bg-[#0e0e0e]/60 border-t border-hairline overflow-hidden">
           <div className="px-6 md:px-12 max-w-[1280px] mx-auto text-center mb-24 relative z-10 space-y-4">
             <span className="font-label-caps text-xs text-[#e7c9a6] uppercase tracking-widest">The Process</span>
             <h2 className="font-headline-md text-4xl sm:text-5xl text-[#e5e2e1]">Intuitive By Design</h2>
@@ -279,12 +306,9 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 strokeLinecap="round"
                 className="blur-md"
                 initial={{ pathLength: 0, opacity: 0.2 }}
-                whileInView={{ pathLength: 1, opacity: [0.3, 0.8, 0.4] }}
+                whileInView={{ pathLength: 1, opacity: activeProcessStep !== -1 ? 0.8 : 0.2 }}
                 viewport={{ once: false, margin: '-50px' }}
-                transition={{
-                  pathLength: { duration: 2.5, ease: 'easeInOut' },
-                  opacity: { duration: 3, repeat: Infinity, ease: 'easeInOut' },
-                }}
+                transition={{ duration: 1.2, ease: 'easeInOut' }}
               />
 
               {/* Main Crisp Gold Dashed Path */}
@@ -309,7 +333,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 initial={{ strokeDashoffset: 340, opacity: 0 }}
                 whileInView={{
                   strokeDashoffset: [340, 0],
-                  opacity: [0, 1, 0],
+                  opacity: activeProcessStep !== -1 ? [0, 1, 0] : 0,
                 }}
                 viewport={{ once: false, margin: '-50px' }}
                 transition={{
@@ -333,7 +357,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               </defs>
             </svg>
 
-            {/* 3 Steps with Active Breathing & Hover-Style Image Animations */}
+            {/* 3 Steps: Glow ONLY highlights actively when scrolling in order through that step */}
             <div className="flex flex-col space-y-24 md:space-y-40 relative z-10">
               {/* Step 1: Plug In */}
               <motion.div
@@ -344,36 +368,32 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 className="flex flex-col md:flex-row items-center gap-12 md:gap-24"
               >
                 <div className="w-full md:w-1/2 flex justify-center md:justify-end">
-                  <motion.div
-                    whileInView={{
-                      scale: [1, 1.06, 1],
-                      boxShadow: [
-                        '0 0 30px rgba(242,202,80,0.25)',
-                        '0 0 55px rgba(242,202,80,0.5)',
-                        '0 0 35px rgba(242,202,80,0.3)',
-                      ],
-                    }}
-                    viewport={{ once: false, margin: '-50px' }}
-                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/40 overflow-hidden relative group"
+                  <div
+                    className={`w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel overflow-hidden relative group transition-all duration-500 ${
+                      activeProcessStep === 0
+                        ? 'border-2 border-[#f2ca50] scale-105 shadow-[0_0_55px_rgba(242,202,80,0.6)]'
+                        : 'border border-[#e7c9a6]/30 opacity-75 shadow-none'
+                    }`}
                   >
-                    <motion.div
-                      whileInView={{
-                        scale: [1, 1.12, 1],
-                        opacity: [0.75, 1, 0.85],
-                      }}
-                      viewport={{ once: false, margin: '-50px' }}
-                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity"
+                    <div
+                      className={`absolute inset-0 bg-cover bg-center transition-all duration-700 ${
+                        activeProcessStep === 0
+                          ? 'opacity-100 scale-110 mix-blend-normal'
+                          : 'opacity-70 mix-blend-luminosity'
+                      }`}
                       style={{ backgroundImage: "url('/images/process_step1.jpg')" }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
                     <div className="absolute bottom-4 inset-x-0 text-center">
-                      <span className="font-label-caps text-[10px] text-[#f2ca50] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline shadow-md">
+                      <span className={`font-label-caps text-[10px] uppercase tracking-widest px-3 py-1 rounded-full border transition-all duration-300 ${
+                        activeProcessStep === 0
+                          ? 'text-[#f2ca50] bg-[#131313]/90 border-[#f2ca50]/60 font-bold'
+                          : 'text-[#d0c5af]/80 bg-[#131313]/70 border-hairline'
+                      }`}>
                         Audio Input
                       </span>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
                 <div className="w-full md:w-1/2 text-center md:text-left">
                   <span className="font-label-caps text-[#f2ca50] tracking-widest text-sm mb-3 block font-bold">STEP 01</span>
@@ -393,36 +413,32 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 className="flex flex-col md:flex-row-reverse items-center gap-12 md:gap-24"
               >
                 <div className="w-full md:w-1/2 flex justify-center md:justify-start">
-                  <motion.div
-                    whileInView={{
-                      scale: [1, 1.06, 1],
-                      boxShadow: [
-                        '0 0 30px rgba(231,201,166,0.25)',
-                        '0 0 55px rgba(231,201,166,0.5)',
-                        '0 0 35px rgba(231,201,166,0.3)',
-                      ],
-                    }}
-                    viewport={{ once: false, margin: '-50px' }}
-                    transition={{ duration: 3, delay: 0.6, repeat: Infinity, ease: 'easeInOut' }}
-                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/40 overflow-hidden relative group"
+                  <div
+                    className={`w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel overflow-hidden relative group transition-all duration-500 ${
+                      activeProcessStep === 1
+                        ? 'border-2 border-[#e7c9a6] scale-105 shadow-[0_0_55px_rgba(231,201,166,0.6)]'
+                        : 'border border-[#e7c9a6]/30 opacity-75 shadow-none'
+                    }`}
                   >
-                    <motion.div
-                      whileInView={{
-                        scale: [1, 1.12, 1],
-                        opacity: [0.75, 1, 0.85],
-                      }}
-                      viewport={{ once: false, margin: '-50px' }}
-                      transition={{ duration: 3, delay: 0.6, repeat: Infinity, ease: 'easeInOut' }}
-                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity"
+                    <div
+                      className={`absolute inset-0 bg-cover bg-center transition-all duration-700 ${
+                        activeProcessStep === 1
+                          ? 'opacity-100 scale-110 mix-blend-normal'
+                          : 'opacity-70 mix-blend-luminosity'
+                      }`}
                       style={{ backgroundImage: "url('/images/process_step2.jpg')" }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
                     <div className="absolute bottom-4 inset-x-0 text-center">
-                      <span className="font-label-caps text-[10px] text-[#e7c9a6] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline shadow-md">
+                      <span className={`font-label-caps text-[10px] uppercase tracking-widest px-3 py-1 rounded-full border transition-all duration-300 ${
+                        activeProcessStep === 1
+                          ? 'text-[#e7c9a6] bg-[#131313]/90 border-[#e7c9a6]/60 font-bold'
+                          : 'text-[#d0c5af]/80 bg-[#131313]/70 border-hairline'
+                      }`}>
                         Live Pitch & Tempo
                       </span>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
                 <div className="w-full md:w-1/2 text-center md:text-right">
                   <span className="font-label-caps text-[#e7c9a6] tracking-widest text-sm mb-3 block font-bold">STEP 02</span>
@@ -442,36 +458,32 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 className="flex flex-col md:flex-row items-center gap-12 md:gap-24"
               >
                 <div className="w-full md:w-1/2 flex justify-center md:justify-end">
-                  <motion.div
-                    whileInView={{
-                      scale: [1, 1.06, 1],
-                      boxShadow: [
-                        '0 0 30px rgba(212,175,55,0.25)',
-                        '0 0 55px rgba(212,175,55,0.5)',
-                        '0 0 35px rgba(212,175,55,0.3)',
-                      ],
-                    }}
-                    viewport={{ once: false, margin: '-50px' }}
-                    transition={{ duration: 3, delay: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-                    className="w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel border border-[#e7c9a6]/40 overflow-hidden relative group"
+                  <div
+                    className={`w-40 h-40 md:w-48 md:h-48 rounded-full glass-panel overflow-hidden relative group transition-all duration-500 ${
+                      activeProcessStep === 2
+                        ? 'border-2 border-[#d4af37] scale-105 shadow-[0_0_55px_rgba(212,175,55,0.6)]'
+                        : 'border border-[#e7c9a6]/30 opacity-75 shadow-none'
+                    }`}
                   >
-                    <motion.div
-                      whileInView={{
-                        scale: [1, 1.12, 1],
-                        opacity: [0.75, 1, 0.85],
-                      }}
-                      viewport={{ once: false, margin: '-50px' }}
-                      transition={{ duration: 3, delay: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-                      className="absolute inset-0 bg-cover bg-center mix-blend-luminosity"
+                    <div
+                      className={`absolute inset-0 bg-cover bg-center transition-all duration-700 ${
+                        activeProcessStep === 2
+                          ? 'opacity-100 scale-110 mix-blend-normal'
+                          : 'opacity-70 mix-blend-luminosity'
+                      }`}
                       style={{ backgroundImage: "url('/images/process_step3.jpg')" }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent" />
                     <div className="absolute bottom-4 inset-x-0 text-center">
-                      <span className="font-label-caps text-[10px] text-[#d4af37] uppercase tracking-widest bg-[#131313]/80 px-3 py-1 rounded-full border border-hairline shadow-md">
+                      <span className={`font-label-caps text-[10px] uppercase tracking-widest px-3 py-1 rounded-full border transition-all duration-300 ${
+                        activeProcessStep === 2
+                          ? 'text-[#d4af37] bg-[#131313]/90 border-[#d4af37]/60 font-bold'
+                          : 'text-[#d0c5af]/80 bg-[#131313]/70 border-hairline'
+                      }`}>
                         AI Companion Stems
                       </span>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
                 <div className="w-full md:w-1/2 text-center md:text-left">
                   <span className="font-label-caps text-[#d4af37] tracking-widest text-sm mb-3 block font-bold">STEP 03</span>
@@ -569,46 +581,33 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                   </div>
                 </div>
 
-                {/* ── PANEL 2: GROWTH ── */}
+                {/* ── PANEL 2: GROWTH (Using Guitar Fretboard image from 'Pulsejam: Dynamic Security Experience') ── */}
                 <div className="w-1/3 h-full px-4 md:px-8 flex items-center justify-center shrink-0">
                   <div className="max-w-[1280px] w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-                    <div className="md:col-span-6 glass-panel border border-hairline rounded-3xl p-8 md:p-12 highlight-top shadow-2xl space-y-6">
-                      <span className="font-label-caps text-xs text-[#e7c9a6] border border-[#4d4635] rounded-full px-4 py-1.5 inline-block bg-[#131313]/70">
-                        Growth
-                      </span>
-                      <h3 className="font-headline-sm text-3xl md:text-5xl text-[#e5e2e1]">Mastering New Scales</h3>
-                      <p className="font-body-md text-base md:text-lg text-[#d0c5af] leading-relaxed">
-                        Break out of your rut. Set parameters for complex modes and let the AI challenge you with unpredictable chord voicings and rhythmic variations.
-                      </p>
+                    <div className="md:col-span-7 bg-[#2a2a2a]/60 rounded-3xl border border-hairline p-8 md:p-12 relative overflow-hidden flex flex-col justify-end min-h-[360px] md:min-h-[440px] shadow-2xl group">
+                      <div
+                        className="absolute inset-0 bg-cover bg-center mix-blend-luminosity opacity-50 group-hover:opacity-75 transition-opacity duration-700 group-hover:scale-105"
+                        style={{ backgroundImage: "url('/images/guitar_fretboard.jpg')" }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-[#131313]/60 to-transparent" />
+
+                      <div className="space-y-4 relative z-10">
+                        <span className="font-label-caps text-xs border border-[#4d4635] rounded-full px-4 py-1.5 inline-block text-[#e7c9a6] bg-[#131313]/70 backdrop-blur">
+                          Growth
+                        </span>
+                        <h3 className="font-headline-sm text-3xl md:text-5xl text-[#e5e2e1]">Mastering New Scales</h3>
+                        <p className="font-body-md text-base md:text-lg text-[#d0c5af] max-w-lg leading-relaxed">
+                          Break out of your rut. Set parameters for complex modes and let the AI challenge you with unpredictable chord voicings and rhythmic variations.
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="md:col-span-6 glass-panel border border-hairline rounded-3xl p-8 md:p-10 highlight-top shadow-2xl space-y-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-full bg-[#f2ca50]/10 border border-[#f2ca50]/30 flex items-center justify-center text-[#f2ca50]">
-                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M22 10v6M2 10v6M12 2v20" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h4 className="font-headline-sm text-2xl text-[#e5e2e1]">AI Mode Complexity</h4>
-                          <p className="font-label-caps text-xs text-[#d0c5af]">Dynamic Harmonics Engine</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 bg-[#131313]/80 p-6 rounded-2xl border border-hairline">
-                        <div className="flex justify-between items-center font-label-caps text-xs text-[#d0c5af]">
-                          <span>Complexity Control</span>
-                          <span className="text-[#f2ca50] font-[#f2ca50] font-bold">{complexity}% Advanced</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={complexity}
-                          onChange={(e) => setComplexity(Number(e.target.value))}
-                          className="w-full accent-[#f2ca50] bg-[#0e0e0e] h-2.5 rounded-lg cursor-pointer"
-                        />
-                      </div>
+                    <div className="md:col-span-5 glass-panel border border-hairline rounded-3xl p-8 md:p-10 highlight-top shadow-2xl space-y-4">
+                      <div className="font-label-caps text-xs text-[#f2ca50] tracking-widest">SCENARIO 02 · GROWTH</div>
+                      <h4 className="font-headline-sm text-2xl text-[#e5e2e1]">Harmonic Sparring Partner</h4>
+                      <p className="font-body-md text-sm text-[#d0c5af] leading-relaxed">
+                        Focus on the AI as a teacher and challenger. Real-time chordal adaptation and scale mode analysis pushing your improvisational skills to new heights.
+                      </p>
                     </div>
                   </div>
                 </div>
