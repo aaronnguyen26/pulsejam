@@ -39,7 +39,7 @@ export default function StudioHomePage() {
   const engineRef = useRef<AudioEngine | null>(null);
 
   // App View Navigation State
-  const [subView, setSubView] = useState<Stage1SubView>('welcome');
+  const [subView, setSubView] = useState<Stage1SubView>('midi-studio');
   const [isCalibrating, setIsCalibrating] = useState<boolean>(false);
   const [isCloudSettingsOpen, setIsCloudSettingsOpen] = useState(false);
 
