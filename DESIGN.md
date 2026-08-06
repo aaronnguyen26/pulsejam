@@ -105,8 +105,12 @@ box-shadow: inset 0 1px 0 rgba(231, 201, 166, 0.2);
 The application is structured into modular screens, each representing a core feature of the PulseJam suite:
 
 1. **`PulseJamRefinedBrandExperience`**: High-impact brand experience featuring vision statement, interactive process journey, bento grid scenarios, local privacy guarantee, and CTA downloads.
-2. **`PulseJamStudioHub`**: Complete DAW studio hub with master bus, audio telemetry visualization, and quick actions.
-3. **`PulseJamPerformanceStems`**: Live performance rack featuring Chill, Groove, and Peak dynamic crossfading stem controls.
-4. **`PulseJamPerformanceAI`**: Magenta.js Web Worker AI accompaniment & real-time pitch detection console.
-5. **`InputCalibrationModal`**: Acoustic mic calibration wizard with real-time level meters and noise-floor threshold sliders.
-6. **`PulseJamLibrary`**: Master tapes project & stem track browser.
+2. **`PulseJamImmersiveWelcomeScreen`**: Cinematic studio entry landing page (`PulseJam: Immersive Welcome Screen`, screen `6809cf2d15cd4b5999af856482b572f8`) featuring obsidian backdrop (`#0a0a0a`), atmospheric radial gold lighting, "PulseJam AI" title, "READY FOR RECORDING" status badge, and quick action launch buttons.
+3. **`PulseJamStudioHubRefined`**: Full DAW studio dashboard (`PulseJam: Studio Hub`, screen `3125699e36de4608953b37bc84658c39`) with side navigation bar (Studio, Sessions, Perform, Engine Status), "Welcome back, Maestro" hero banner, Bento Quick Action cards, master bus controls, and telemetry readouts.
+4. **`PulseJamRefinedCalibration`**: Minimal 2-step acoustic calibration modal overlay (`PulseJam: Refined Calibration`, screen `e88f8a2661d048d392c1f898ddab79cd`) capturing ambient quiet noise floor (5s) and peak loud playing levels (5s) with an animated gold VU meter and circular SVG countdown ring.
+5. **`PulseJamMultiLaneMIDIStudio`**: Multi-lane MIDI & recording studio screen (`Pulsejam: Multi-Lane MIDI Studio`, screen `4ca167612dbd4ce68c415d64b7e313b8`) featuring multi-lane instrument tracks (Lead Synth, Bassline, Drums, AI Accompaniment Master), Mute/Solo/Arm track controls, dynamic "ADD TRACK" capability, live playback + simultaneous replayable note block timeline storage, transport controls (`RECORD`, `STOP`, `PLAY`), and silent background tier analysis.
+6. **`PulsejamAddTrackModal`**: Hardware inset modal dialog (`Pulsejam: Add New Track`, screen `525957a6308b48ea9ae41239851f0c47`) allowing musicians to add new `MIDI Track`, `Audio Track`, or `AI Companion` lanes, configure input source dropdown, and assign track names.
+7. **`PulseJamPerformanceStems`**: Live performance rack featuring Chill, Groove, and Peak dynamic crossfading stem controls.
+8. **`PulseJamPerformanceAI`**: Magenta.js Web Worker AI accompaniment & real-time pitch detection console.
+9. **`PulseJamLibrary`**: Master tapes project & stem track browser.
+

@@ -154,13 +154,6 @@ export class AudioEngine {
       this.micSourceNode = this.ctx.createMediaStreamSource(this.micStream);
       this.micSourceNode.connect(this.workletNode);
 
-      // Start active mode playback
-      if (this.currentAppMode === 'stems' && this.stemEngine) {
-        this.stemEngine.start();
-      } else if (this.currentAppMode === 'ai-gen' && this.aiGenEngine) {
-        this.aiGenEngine.start();
-      }
-
       this.setStatus({ isMicActive: true, errorType: null, errorMessage: null });
       return true;
     } catch (err: unknown) {
@@ -200,6 +193,18 @@ export class AudioEngine {
     }
 
     this.setStatus({ isMicActive: false });
+  }
+
+  public getMicStream(): MediaStream | null {
+    return this.micStream;
+  }
+
+  public getAIGenerationEngine(): AIGenerationEngine | null {
+    return this.aiGenEngine;
+  }
+
+  public getMIDISynthEngine(): MIDISynthEngine | null {
+    return this.midiSynthEngine;
   }
 
   public setAppMode(appMode: AppMode) {

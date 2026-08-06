@@ -41,6 +41,7 @@ export interface DSPMetrics {
   mode: OperatingMode;
   calibration: CalibrationData;
   timestamp: number;
+  peakAmplitude?: number;
   // Stage 2 Monophonic Pitch Additions
   currentPitch?: number | null;     // MIDI note (e.g. 60 = C4)
   currentFrequency?: number | null; // Hz (e.g. 261.63)

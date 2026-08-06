@@ -347,6 +347,7 @@ class PulseJamDSPProcessor extends AudioWorkletProcessor {
           mode: this.mode,
           calibration: this.calibration,
           timestamp: nowSec,
+          peakAmplitude: maxAbs,
           currentPitch: this.currentPitch,
           currentFrequency: this.currentFrequency,
           pitchConfidence: this.pitchConfidence,

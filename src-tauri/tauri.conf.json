@@ -6,15 +6,16 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:3000/studio",
     "frontendDist": "../out"
   },
   "app": {
     "windows": [
       {
-        "title": "PulseJam AI — Reactive Instrument Companion",
-        "width": 1100,
-        "height": 780,
+        "title": "PulseJam AI — Studio Console",
+        "url": "studio.html",
+        "width": 1280,
+        "height": 850,
         "resizable": true,
         "fullscreen": false,
         "center": true

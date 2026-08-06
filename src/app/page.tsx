@@ -4,10 +4,9 @@ import React from 'react';
 import { RefinedBrandExperienceScreen } from '@/components/screens/RefinedBrandExperienceScreen';
 
 /**
- * Main App Page: PulseJam AI — Refined Brand Experience
- * Rendered with Lenis smooth scrolling (driven via SmoothScroll wrapper in layout.tsx)
- * and styling specifications from DESIGN.md.
+ * Website UI Landing Page: PulseJam AI — Refined Brand Experience
+ * Served at http://localhost:3000/ (Website UI)
  */
-export default function PulseJamApp() {
+export default function WebsiteHomePage() {
   return <RefinedBrandExperienceScreen />;
 }
