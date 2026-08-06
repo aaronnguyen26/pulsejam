@@ -33,7 +33,7 @@ import { CloudVibeToolbar } from '@/components/CloudVibeToolbar';
 import { CloudVibeSettingsModal } from '@/components/CloudVibeSettingsModal';
 import { DesktopDownloadBanner } from '@/components/DesktopDownloadBanner';
 
-export type Stage1SubView = 'welcome' | 'studio-hub' | 'midi-studio' | 'daw-console';
+export type Stage1SubView = 'welcome' | 'studio-hub' | 'midi-studio';
 
 export default function StudioHomePage() {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -153,15 +153,8 @@ export default function StudioHomePage() {
 
   return (
     <div className="relative min-h-screen bg-[#121414] text-[#e3e2e2]">
-      {/* Floating Mode Switcher Header */}
+      {/* Floating Mode Switcher Header: Welcome, Studio Hub, MIDI Studio */}
       <header className="fixed top-3 right-6 z-50 flex items-center gap-2 bg-[#1e2020]/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-[#4d4635]/40 shadow-lg">
-        <Link
-          href="/"
-          className="px-3 py-1 rounded-full font-mono text-[10px] uppercase font-bold tracking-wider text-[#d0c5af] hover:text-[#f2ca50] border-r border-[#4d4635]/50 pr-3 flex items-center gap-1"
-        >
-          <span>← Website</span>
-        </Link>
-
         <button
           onClick={() => setSubView('welcome')}
           className={`px-3 py-1 rounded-full font-mono text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer ${
@@ -194,17 +187,6 @@ export default function StudioHomePage() {
         >
           MIDI Studio
         </button>
-
-        <button
-          onClick={() => setSubView('daw-console')}
-          className={`px-3 py-1 rounded-full font-mono text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer ${
-            subView === 'daw-console'
-              ? 'bg-[#f2ca50] text-[#3c2f00] shadow-[0_0_10px_rgba(242,202,80,0.4)]'
-              : 'text-[#d0c5af] hover:text-[#f2ca50]'
-          }`}
-        >
-          DAW Console
-        </button>
       </header>
 
       {/* ── Screen 1: Immersive Welcome Screen ────────────────────── */}
@@ -232,98 +214,6 @@ export default function StudioHomePage() {
           onOpenCalibration={() => setIsCalibrating(true)}
           onNavigateBack={() => setSubView('studio-hub')}
         />
-      )}
-
-      {/* ── Screen 5: Full DAW Console Studio Workspace ────────────── */}
-      {subView === 'daw-console' && (
-        <div className="p-4 md:p-8 space-y-6 pt-16">
-          <header className="glass-panel p-4 md:p-6 rounded-2xl border border-hairline highlight-top flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 rounded-xl bg-gradient-brass flex items-center justify-center text-[#3c2f00] font-bold shadow-[0_0_15px_rgba(242,202,80,0.25)]">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="font-headline-sm text-xl md:text-2xl text-[#e5e2e1] flex items-center gap-3">
-                  <span>PulseJam DAW Workspace</span>
-                  <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-[#f2ca50]/10 text-[#f2ca50] border border-[#f2ca50]/30 font-normal">
-                    STAGE 1-4
-                  </span>
-                </h1>
-                <p className="font-label-caps text-xs text-[#d0c5af] mt-0.5">
-                  Zero-Latency Multi-Tier Stem & AI Generation Console
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <ModeToggle mode={appMode} onChange={handleChangeAppMode} />
-              <div className="hidden sm:block border-l border-hairline pl-4">
-                <TierGauge activeTier={activeTier} metrics={metrics} />
-              </div>
-            </div>
-          </header>
-
-          <StatusBanner
-            errorType={status.errorType}
-            errorMessage={status.errorMessage}
-            onDismiss={() => {
-              if (engineRef.current) {
-                engineRef.current['setError']?.(null, '');
-              }
-            }}
-          />
-
-          <DesktopDownloadBanner />
-
-          <CloudVibeToolbar
-            metrics={cloudMetrics}
-            onToggle={handleToggleCloudVibe}
-            onOpenSettings={() => setIsCloudSettingsOpen(true)}
-            onVolumeChange={(vol) => engineRef.current?.setCloudVibeVolume(vol)}
-            onStop={() => engineRef.current?.stopCloudVibe()}
-          />
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 space-y-6">
-              <Visualizer metrics={metrics} activeTier={activeTier} />
-
-              <ControlPanel
-                isMicActive={status.isMicActive}
-                mode={operatingMode}
-                activeTier={overrideTier}
-                stemSource={stemSource}
-                onToggleMic={handleToggleMic}
-                onSelectMode={handleSelectMode}
-                onChangeStemSource={handleChangeStemSource}
-                onOpenCalibration={() => setIsCalibrating(true)}
-              />
-            </div>
-
-            <div className="lg:col-span-4 space-y-6">
-              {appMode === 'ai-gen' && (
-                <AIGenerationMonitor
-                  metrics={aiMetrics}
-                  logs={aiLogs}
-                  onClear={() => {
-                    setAiLogs([]);
-                    engineRef.current?.clearAIGenLogs();
-                  }}
-                />
-              )}
-
-              <LatencyMonitor
-                logs={latencyLogs}
-                onClear={() => {
-                  setLatencyLogs([]);
-                  engineRef.current?.clearLatencyHistory();
-                }}
-              />
-            </div>
-          </div>
-        </div>
       )}
 
       {/* ── Screen 3: Refined 2-Step Acoustic Calibration Modal ────── */}
