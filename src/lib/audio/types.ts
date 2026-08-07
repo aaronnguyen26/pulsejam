@@ -13,6 +13,9 @@ export interface CalibrationData {
   normalDb: number;
   loudDb: number;
   onsetThreshold: number;
+  pitchConfidenceScore?: number; // 0..100 composite confidence percentage
+  isPitchVerified?: boolean;     // whether phrase detection hard gate passed
+  calibratedAtGainDb?: number;   // inputGainDb value at time of calibration
 }
 
 export interface MIDINoteEvent {

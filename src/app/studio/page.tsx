@@ -32,15 +32,17 @@ import { AIGenerationMonitor } from '@/components/AIGenerationMonitor';
 import { CloudVibeToolbar } from '@/components/CloudVibeToolbar';
 import { CloudVibeSettingsModal } from '@/components/CloudVibeSettingsModal';
 import { DesktopDownloadBanner } from '@/components/DesktopDownloadBanner';
+import { StudioSettingsModal } from '@/components/StudioSettingsModal';
 
 export type Stage1SubView = 'welcome' | 'studio-hub' | 'midi-studio';
 
 export default function StudioHomePage() {
   const engineRef = useRef<AudioEngine | null>(null);
 
-  // App View Navigation State
-  const [subView, setSubView] = useState<Stage1SubView>('midi-studio');
+  // App View Navigation State (Lands on Studio Hub by default)
+  const [subView, setSubView] = useState<Stage1SubView>('studio-hub');
   const [isCalibrating, setIsCalibrating] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCloudSettingsOpen, setIsCloudSettingsOpen] = useState(false);
 
   // Audio Engine Subscriptions & Telemetry
@@ -204,6 +206,7 @@ export default function StudioHomePage() {
           audioEngine={engineRef.current}
           onLaunchLiveSession={() => setSubView('midi-studio')}
           onOpenCalibration={() => setIsCalibrating(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       )}
 
@@ -212,16 +215,25 @@ export default function StudioHomePage() {
         <MultiLaneMIDIStudioScreen
           audioEngine={engineRef.current}
           onOpenCalibration={() => setIsCalibrating(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onNavigateBack={() => setSubView('studio-hub')}
         />
       )}
 
-      {/* ── Screen 3: Refined 2-Step Acoustic Calibration Modal ────── */}
+      {/* ── Screen 3: Refined Acoustic Calibration Modal ────── */}
       <RefinedCalibrationModal
         isOpen={isCalibrating}
         audioEngine={engineRef.current}
         onComplete={handleCalibrationComplete}
         onSkip={handleCalibrationSkip}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+
+      {/* ── Screen 5: PulseJam Studio Settings & Mic Check Modal ─── */}
+      <StudioSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        audioEngine={engineRef.current}
       />
 
       {/* Cloud Vibe Settings Modal */}

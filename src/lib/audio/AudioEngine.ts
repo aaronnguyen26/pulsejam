@@ -20,6 +20,7 @@ import { FileStemProvider, SyntheticStemProvider } from './StemProviders';
 import { MIDISynthEngine } from './MIDISynthEngine';
 import { AIGenerationEngine } from './AIGenerationEngine';
 import { LyriaSessionManager } from '../lyria/LyriaSessionManager';
+import { useAudioSettingsStore } from '../state/audioSettingsStore';
 
 type MetricsCallback = (metrics: DSPMetrics) => void;
 type LatencyCallback = (entry: LatencyLogEntry) => void;
@@ -32,7 +33,10 @@ export class AudioEngine {
   private ctx: AudioContext | null = null;
   private micStream: MediaStream | null = null;
   private micSourceNode: MediaStreamAudioSourceNode | null = null;
+  private gainNode: GainNode | null = null;
+  private biquadFilterNode: BiquadFilterNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
+  private activeCalibration: CalibrationData | null = null;
 
   private stemEngine: StemEngine | null = null;
   private midiSynthEngine: MIDISynthEngine | null = null;
@@ -116,6 +120,24 @@ export class AudioEngine {
       this.workletNode.connect(dummyGain);
       dummyGain.connect(this.ctx.destination);
 
+      // Subscribe to audio settings store changes for real-time reactivity
+      useAudioSettingsStore.subscribe((state, prevState) => {
+        if (state.inputGainDb !== prevState.inputGainDb) {
+          this.setInputGainDb(state.inputGainDb);
+        }
+        if (state.lowCutFilter !== prevState.lowCutFilter) {
+          this.setLowCutFilter(state.lowCutFilter);
+        }
+        if (
+          state.selectedDeviceId !== prevState.selectedDeviceId ||
+          state.inputMode !== prevState.inputMode
+        ) {
+          if (this.status.isMicActive) {
+            this.restartMicrophone();
+          }
+        }
+      });
+
       this.setStatus({ isInitialized: true, errorType: null, errorMessage: null });
       return true;
     } catch (err: unknown) {
@@ -135,10 +157,15 @@ export class AudioEngine {
       await this.ctx.resume();
     }
 
+    // Read current settings from store
+    const settings = useAudioSettingsStore.getState();
+    const isAcoustic = settings.inputMode === 'acoustic';
+
     const constraints: MediaStreamConstraints = {
       audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
+        deviceId: settings.selectedDeviceId ? { exact: settings.selectedDeviceId } : undefined,
+        echoCancellation: isAcoustic,
+        noiseSuppression: isAcoustic,
         autoGainControl: false,
       },
       video: false,
@@ -152,7 +179,21 @@ export class AudioEngine {
 
       this.micStream = await navigator.mediaDevices.getUserMedia(constraints);
       this.micSourceNode = this.ctx.createMediaStreamSource(this.micStream);
-      this.micSourceNode.connect(this.workletNode);
+
+      // 1. GainNode (Input Gain Control)
+      this.gainNode = this.ctx.createGain();
+      const linearGain = Math.max(0, Math.pow(10, settings.inputGainDb / 20));
+      this.gainNode.gain.setValueAtTime(linearGain, this.ctx.currentTime);
+
+      // 2. BiquadFilterNode (Low Cut Filter - Highpass ~80Hz)
+      this.biquadFilterNode = this.ctx.createBiquadFilter();
+      this.biquadFilterNode.type = 'highpass';
+      this.biquadFilterNode.frequency.setValueAtTime(settings.lowCutFilter ? 80 : 0, this.ctx.currentTime);
+
+      // 3. Connect Chain: micSource -> gainNode -> biquadFilterNode -> workletNode
+      this.micSourceNode.connect(this.gainNode);
+      this.gainNode.connect(this.biquadFilterNode);
+      this.biquadFilterNode.connect(this.workletNode);
 
       this.setStatus({ isMicActive: true, errorType: null, errorMessage: null });
       return true;
@@ -173,7 +214,58 @@ export class AudioEngine {
     }
   }
 
+  public setInputGainDb(db: number) {
+    if (this.gainNode && this.ctx) {
+      const linearGain = Math.max(0, Math.pow(10, db / 20));
+      this.gainNode.gain.setValueAtTime(linearGain, this.ctx.currentTime);
+
+      // Auto-derive quietDb / loudDb thresholds when gain changes after calibration
+      if (this.activeCalibration && typeof this.activeCalibration.calibratedAtGainDb === 'number') {
+        const gainDelta = db - this.activeCalibration.calibratedAtGainDb;
+        const adjustedQuiet = Math.min(-15, Math.max(-75, Math.round(this.activeCalibration.quietDb + gainDelta)));
+        const adjustedLoud = Math.min(-1, Math.max(-25, Math.round(this.activeCalibration.loudDb + gainDelta)));
+        const adjustedNormal = Math.round((adjustedQuiet + adjustedLoud) / 2);
+
+        if (this.workletNode) {
+          this.workletNode.port.postMessage({
+            type: 'SET_CALIBRATION',
+            payload: {
+              ...this.activeCalibration,
+              quietDb: adjustedQuiet,
+              normalDb: adjustedNormal,
+              loudDb: adjustedLoud,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  public setLowCutFilter(enabled: boolean) {
+    if (this.biquadFilterNode && this.ctx) {
+      this.biquadFilterNode.frequency.setValueAtTime(enabled ? 80 : 0, this.ctx.currentTime);
+    }
+  }
+
+  public async restartMicrophone(): Promise<boolean> {
+    if (this.status.isMicActive) {
+      this.stopMicrophone();
+      return await this.startMicrophone();
+    }
+    return true;
+  }
+
   public stopMicrophone() {
+    if (this.biquadFilterNode) {
+      this.biquadFilterNode.disconnect();
+      this.biquadFilterNode = null;
+    }
+
+    if (this.gainNode) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
+    }
+
     if (this.micSourceNode) {
       this.micSourceNode.disconnect();
       this.micSourceNode = null;
@@ -246,12 +338,17 @@ export class AudioEngine {
   }
 
   public setCalibration(calibration: CalibrationData) {
+    this.activeCalibration = calibration;
     if (this.workletNode) {
       this.workletNode.port.postMessage({
         type: 'SET_CALIBRATION',
         payload: calibration,
       });
     }
+  }
+
+  public getActiveCalibration(): CalibrationData | null {
+    return this.activeCalibration;
   }
 
   public setOperatingMode(mode: OperatingMode, overrideTier?: PerformanceTier) {
@@ -388,6 +485,10 @@ export class AudioEngine {
 
   public getStatus(): AudioEngineStatus {
     return this.status;
+  }
+
+  public getAudioContext(): AudioContext | null {
+    return this.ctx;
   }
 
   public destroy() {

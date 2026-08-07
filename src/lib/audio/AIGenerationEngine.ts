@@ -30,8 +30,8 @@ export class AIGenerationEngine {
   private timerId: NodeJS.Timeout | null = null;
 
   private currentBarIndex = 0;
-  private pendingGenerations: Map<number, { drums: NoteSequencePayload | null; melody: NoteSequencePayload | null; latencyMs: number }> = new Map();
-  private lastGeneratedBar: { drums: NoteSequencePayload | null; melody: NoteSequencePayload | null } | null = null;
+  private pendingGenerations: Map<number, { drums: NoteSequencePayload | null; melody: NoteSequencePayload | null; bass: NoteSequencePayload | null; latencyMs: number }> = new Map();
+  private lastGeneratedBar: { drums: NoteSequencePayload | null; melody: NoteSequencePayload | null; bass: NoteSequencePayload | null } | null = null;
 
   private latencyLogs: AIGenerationLogEntry[] = [];
   private metricsListeners: Set<AIGenMetricsCallback> = new Set();
@@ -74,11 +74,11 @@ export class AIGenerationEngine {
     });
   }
 
-  public start() {
+  public start(startOffsetSec: number = 0) {
     if (this.isActive) return;
     this.isActive = true;
-    this.currentBarIndex = 0;
-    this.startTime = this.ctx.currentTime + 0.05;
+    this.currentBarIndex = Math.floor(startOffsetSec / this.secondsPerBar);
+    this.startTime = (this.ctx.currentTime + 0.05) - startOffsetSec;
 
     // Align bar boundary loop
     this.scheduleNextBarBoundary();
@@ -113,21 +113,24 @@ export class AIGenerationEngine {
     let isFallback = false;
     let playDrums: NoteSequencePayload | null = null;
     let playMelody: NoteSequencePayload | null = null;
+    let playBass: NoteSequencePayload | null = null;
 
     if (genResult) {
       playDrums = genResult.drums;
       playMelody = genResult.melody;
-      this.lastGeneratedBar = { drums: playDrums, melody: playMelody };
+      playBass = genResult.bass;
+      this.lastGeneratedBar = { drums: playDrums, melody: playMelody, bass: playBass };
       this.pendingGenerations.delete(targetBarToPlay);
     } else if (this.lastGeneratedBar) {
       // Graceful Fallback: Repeat previous bar if Worker computation is delayed
       playDrums = this.lastGeneratedBar.drums;
       playMelody = this.lastGeneratedBar.melody;
+      playBass = this.lastGeneratedBar.bass;
       isFallback = true;
     }
 
-    if (playDrums || playMelody) {
-      this.synth.scheduleBarPlayback(playDrums, playMelody, nextBarTime, this.bpm);
+    if (playDrums || playMelody || playBass) {
+      this.synth.scheduleBarPlayback(playDrums, playMelody, playBass, nextBarTime, this.bpm);
     }
 
     // 2. Trigger 1-Bar Lookahead Generation Request for Bar (N+2)
@@ -142,17 +145,8 @@ export class AIGenerationEngine {
   private requestBarGeneration(targetBarIndex: number) {
     if (!this.worker || !this.isWorkerReady) return;
 
-    // Format current buffered notes into primed sequence
-    const primedSeq = {
-      notes: this.bufferedNotes.map((n) => ({
-        pitch: n.pitch,
-        velocity: n.velocity,
-        startTime: n.startTime,
-        endTime: n.startTime + n.duration,
-      })),
-      totalTime: this.secondsPerBar,
-      quantizationInfo: { stepsPerQuarter: 4 },
-    };
+    // Format current primed sequence (self-continuation chain + live pitch blending)
+    const primedSeq = this.getPrimedSequenceForBar(targetBarIndex);
 
     this.worker.postMessage({
       type: 'GENERATE_BAR',
@@ -165,6 +159,96 @@ export class AIGenerationEngine {
     });
   }
 
+  private getPrimedSequenceForBar(targetBarIndex: number): NoteSequencePayload {
+    const liveNotesFormatted: MIDINoteEvent[] = this.bufferedNotes.map((n) => ({
+      pitch: n.pitch,
+      velocity: n.velocity,
+      startTime: Math.max(0, Math.min(this.secondsPerBar, n.startTime % this.secondsPerBar)),
+      duration: Math.max(0.1, n.duration),
+    }));
+
+    const lastMelodyNotes = this.lastGeneratedBar?.melody?.notes || [];
+
+    // Case 1: First bar of session (seed ONLY on bar 1 if no live input)
+    if (targetBarIndex <= 1 && lastMelodyNotes.length === 0) {
+      if (liveNotesFormatted.length > 0) {
+        return {
+          notes: liveNotesFormatted,
+          totalTime: this.secondsPerBar,
+          qpm: this.bpm,
+          quantizationInfo: { stepsPerQuarter: 4 },
+        };
+      }
+      return {
+        notes: [
+          { pitch: 60, velocity: 0.8, startTime: 0, duration: 0.5 },
+          { pitch: 64, velocity: 0.8, startTime: 0.5, duration: 0.5 },
+          { pitch: 67, velocity: 0.8, startTime: 1.0, duration: 0.5 },
+        ],
+        totalTime: this.secondsPerBar,
+        qpm: this.bpm,
+        quantizationInfo: { stepsPerQuarter: 4 },
+      };
+    }
+
+    // Case 2: Subsequent bars (self-continuation chain default when silent)
+    if (liveNotesFormatted.length === 0) {
+      const chainNotes: MIDINoteEvent[] = lastMelodyNotes.map((n) => {
+        const start = n.startTime ?? ((n.quantizedStartStep || 0) * 0.125);
+        const dur = n.duration ?? (((n.quantizedEndStep || 2) - (n.quantizedStartStep || 0)) * 0.125);
+        return {
+          pitch: n.pitch,
+          velocity: n.velocity || 0.8,
+          startTime: start,
+          duration: Math.max(0.1, dur),
+        };
+      });
+
+      return {
+        notes: chainNotes.length > 0 ? chainNotes : [
+          { pitch: 60, velocity: 0.8, startTime: 0, duration: 0.5 },
+          { pitch: 64, velocity: 0.8, startTime: 0.5, duration: 0.5 },
+          { pitch: 67, velocity: 0.8, startTime: 1.0, duration: 0.5 },
+        ],
+        totalTime: this.secondsPerBar,
+        qpm: this.bpm,
+        quantizationInfo: { stepsPerQuarter: 4 },
+      };
+    }
+
+    // Case 3: Blend live pitch into self-continuation chain
+    const blendedNotes: MIDINoteEvent[] = [...liveNotesFormatted];
+
+    for (const chainNote of lastMelodyNotes) {
+      const chainStart = chainNote.startTime ?? ((chainNote.quantizedStartStep || 0) * 0.125);
+      const chainDur = chainNote.duration ?? (((chainNote.quantizedEndStep || 2) - (chainNote.quantizedStartStep || 0)) * 0.125);
+      const chainEnd = chainStart + chainDur;
+
+      const hasLiveOverlap = liveNotesFormatted.some((liveNote) => {
+        const liveEnd = liveNote.startTime + liveNote.duration;
+        return liveNote.startTime < chainEnd + 0.15 && liveEnd > chainStart - 0.15;
+      });
+
+      if (!hasLiveOverlap) {
+        blendedNotes.push({
+          pitch: chainNote.pitch,
+          velocity: chainNote.velocity || 0.7,
+          startTime: chainStart,
+          duration: Math.max(0.1, chainDur),
+        });
+      }
+    }
+
+    blendedNotes.sort((a, b) => a.startTime - b.startTime);
+
+    return {
+      notes: blendedNotes,
+      totalTime: this.secondsPerBar,
+      qpm: this.bpm,
+      quantizationInfo: { stepsPerQuarter: 4 },
+    };
+  }
+
   private handleWorkerMessage(data: { type: string; payload: unknown }) {
     if (!data || !data.type) return;
 
@@ -172,9 +256,10 @@ export class AIGenerationEngine {
       this.isWorkerReady = true;
       this.notifyMetrics();
     } else if (data.type === 'BAR_GENERATED') {
-      const { drumsSequence, melodySequence, barIndex, generationLatencyMs } = data.payload as {
+      const { drumsSequence, melodySequence, bassSequence, barIndex, generationLatencyMs } = data.payload as {
         drumsSequence: NoteSequencePayload;
         melodySequence: NoteSequencePayload;
+        bassSequence?: NoteSequencePayload;
         barIndex: number;
         generationLatencyMs: number;
       };
@@ -182,6 +267,7 @@ export class AIGenerationEngine {
       this.pendingGenerations.set(barIndex, {
         drums: drumsSequence,
         melody: melodySequence,
+        bass: bassSequence || null,
         latencyMs: generationLatencyMs,
       });
 
