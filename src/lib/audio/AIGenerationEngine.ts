@@ -3,8 +3,10 @@ import {
   AIGenerationMetrics,
   MIDINoteEvent,
   NoteSequencePayload,
+  PerformanceTier,
 } from './types';
 import { MIDISynthEngine } from './MIDISynthEngine';
+import { getTemperatureForTier } from './magentaLogic';
 
 type AIGenMetricsCallback = (metrics: AIGenerationMetrics) => void;
 type AIGenLogCallback = (entry: AIGenerationLogEntry) => void;
@@ -38,6 +40,7 @@ export class AIGenerationEngine {
   private logListeners: Set<AIGenLogCallback> = new Set();
 
   private bufferedNotes: MIDINoteEvent[] = [];
+  private activeTier: PerformanceTier = 'groove';
 
   constructor(ctx: AudioContext, synth: MIDISynthEngine) {
     this.ctx = ctx;
@@ -47,7 +50,7 @@ export class AIGenerationEngine {
   public initializeWorker(): Promise<boolean> {
     return new Promise((resolve) => {
       try {
-        this.worker = new Worker('/workers/magenta-worker.js');
+        this.worker = new Worker(new URL('./magenta-worker.ts', import.meta.url));
         this.worker.onmessage = (event) => this.handleWorkerMessage(event.data);
         this.worker.postMessage({ type: 'INIT_WORKER' });
 
@@ -96,6 +99,10 @@ export class AIGenerationEngine {
 
   public updateBufferedNotes(notes: MIDINoteEvent[]) {
     this.bufferedNotes = notes;
+  }
+
+  public setActiveTier(tier: PerformanceTier) {
+    this.activeTier = tier;
   }
 
   private scheduleNextBarBoundary() {
@@ -148,18 +155,21 @@ export class AIGenerationEngine {
     // Format current primed sequence (self-continuation chain + live pitch blending)
     const primedSeq = this.getPrimedSequenceForBar(targetBarIndex);
 
+    const temperature = getTemperatureForTier(this.activeTier);
+
     this.worker.postMessage({
       type: 'GENERATE_BAR',
       payload: {
         primedSequence: primedSeq,
         stepsPerBar: 16,
-        temperature: 1.0,
+        temperature,
+        activeTier: this.activeTier,
         barIndex: targetBarIndex,
       },
     });
   }
 
-  private getPrimedSequenceForBar(targetBarIndex: number): NoteSequencePayload {
+  public getPrimedSequenceForBar(targetBarIndex: number): NoteSequencePayload {
     const liveNotesFormatted: MIDINoteEvent[] = this.bufferedNotes.map((n) => ({
       pitch: n.pitch,
       velocity: n.velocity,

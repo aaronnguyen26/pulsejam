@@ -7,6 +7,7 @@ import {
   PerformanceTier,
   AudioEngineStatus,
   NoteSequencePayload,
+  SidecarStatus,
 } from '@/lib/audio/types';
 import { AddTrackModal, TrackType } from '@/components/AddTrackModal';
 import { useAudioSettingsStore } from '@/lib/state/audioSettingsStore';
@@ -514,6 +515,9 @@ export function MultiLaneMIDIStudioScreen({
 
   // Audio Engine Worklet Metric Listener for Live Input Waveform & Telemetry
   const [pitchConfidenceState, setPitchConfidenceState] = useState<number | null>(null);
+  const [liveConfidenceState, setLiveConfidenceState] = useState<number>(0);
+  const [liveConditioningModeState, setLiveConditioningModeState] = useState<'midi+audio' | 'audio-only'>('midi+audio');
+  const [sidecarStatusState, setSidecarStatusState] = useState<SidecarStatus>({ state: 'unavailable' });
 
   useEffect(() => {
     if (!audioEngine) return;
@@ -528,6 +532,10 @@ export function MultiLaneMIDIStudioScreen({
         setPitchConfidenceState(metrics.calibration.pitchConfidenceScore);
       }
 
+      if (metrics.pitchConfidence !== undefined) {
+        setLiveConfidenceState(Math.round(metrics.pitchConfidence * 100));
+      }
+
       // Collect real-time peak amplitude for live input waveform lane when recording
       const amp = metrics.peakAmplitude ?? Math.min(1.0, Math.max(0.05, (metrics.rawRmsDb + 60) / 60));
       liveWaveformBufferRef.current.push(amp);
@@ -536,7 +544,21 @@ export function MultiLaneMIDIStudioScreen({
       }
     });
 
-    return () => unsubMetrics();
+    const bridge = audioEngine.getConditioningBridge();
+    let unsubSidecar: (() => void) | undefined;
+    let unsubFrames: (() => void) | undefined;
+    if (bridge) {
+      unsubSidecar = bridge.subscribeSidecarStatus((st) => setSidecarStatusState(st));
+      unsubFrames = bridge.subscribeFrames((frame) => {
+        setLiveConditioningModeState(frame.mode);
+      });
+    }
+
+    return () => {
+      unsubMetrics();
+      if (unsubSidecar) unsubSidecar();
+      if (unsubFrames) unsubFrames();
+    };
   }, [audioEngine]);
 
   // Track Control Toggles (MUTE, SOLO, REC)
@@ -1424,7 +1446,60 @@ export function MultiLaneMIDIStudioScreen({
         </div>
 
         {/* Right Side Status */}
-        <div className="flex-1 flex items-center justify-end gap-4">
+        <div className="flex-1 flex items-center justify-end gap-2.5">
+          {/* Live Conditioning Mode Indicator */}
+          <div
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-mono font-bold uppercase tracking-wider ${
+              liveConditioningModeState === 'midi+audio'
+                ? 'text-purple-300 border-purple-800/60 bg-purple-950/40'
+                : 'text-amber-300 border-amber-800/60 bg-amber-950/40'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                liveConditioningModeState === 'midi+audio' ? 'bg-purple-400' : 'bg-amber-400'
+              }`}
+            />
+            <span>MODE: {liveConditioningModeState.toUpperCase()}</span>
+          </div>
+
+          {/* Live Signal Pitch Confidence Readout */}
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-mono font-bold uppercase tracking-wider text-sky-300 border-sky-800/60 bg-sky-950/40">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+            <span>LIVE SIGNAL: {liveConfidenceState}%</span>
+          </div>
+
+          {/* Sidecar Connection Status Indicator */}
+          {(() => {
+            const state = sidecarStatusState.state;
+            const rtt = sidecarStatusState.roundTripMs;
+            let label = 'SIDECAR: STANDBY';
+            let badgeStyle = 'text-slate-400 border-slate-700/60 bg-slate-900/40';
+            let dotStyle = 'bg-slate-500';
+
+            if (state === 'connecting') {
+              label = 'SIDECAR: CONNECTING';
+              badgeStyle = 'text-cyan-300 border-cyan-800/60 bg-cyan-950/40';
+              dotStyle = 'bg-cyan-400 animate-pulse';
+            } else if (state === 'connected') {
+              label = `SIDECAR: ONLINE ${rtt ? `(${rtt}ms)` : ''}`;
+              badgeStyle = 'text-emerald-300 border-emerald-800/60 bg-emerald-950/40';
+              dotStyle = 'bg-emerald-400';
+            } else if (state === 'high-latency') {
+              label = `SIDECAR: HIGH LATENCY (${rtt}ms)`;
+              badgeStyle = 'text-amber-300 border-amber-800/60 bg-amber-950/40';
+              dotStyle = 'bg-amber-400';
+            }
+
+            return (
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-mono font-bold uppercase tracking-wider ${badgeStyle}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${dotStyle}`} />
+                <span>{label}</span>
+              </div>
+            );
+          })()}
+
+          {/* Calibration Input Stability Status Badge */}
           <div className="flex flex-col items-end">
             {(() => {
               const activeCal = audioEngine?.getActiveCalibration() || null;
@@ -1439,7 +1514,7 @@ export function MultiLaneMIDIStudioScreen({
                     <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-[#81c784] uppercase">
                       <span className="w-2 h-2 rounded-full bg-[#81c784] shadow-[0_0_8px_rgba(129,199,132,0.6)]" />
                       <span>
-                        INPUT STABLE {gainDelta !== 0 ? `(GAIN ADJ ${gainDelta > 0 ? `+${gainDelta}` : gainDelta}dB)` : `(CONFIDENCE: ${pitchConfidenceState ?? activeCal.pitchConfidenceScore ?? 85}%)`}
+                        INPUT STABLE {gainDelta !== 0 ? `(GAIN ADJ ${gainDelta > 0 ? `+${gainDelta}` : gainDelta}dB)` : `(CALIBRATION CONFIDENCE: ${activeCal.pitchConfidenceScore ?? 85}%)`}
                       </span>
                     </div>
                     <span className="text-[8px] font-mono text-[#d0c5af]/80 uppercase font-bold">

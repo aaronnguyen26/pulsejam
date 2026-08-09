@@ -16,7 +16,26 @@ export interface CalibrationData {
   pitchConfidenceScore?: number; // 0..100 composite confidence percentage
   isPitchVerified?: boolean;     // whether phrase detection hard gate passed
   calibratedAtGainDb?: number;   // inputGainDb value at time of calibration
+  pitchRangeLow?: number;        // lowest detected pitch (MIDI note 0..127)
+  pitchRangeHigh?: number;       // highest detected pitch (MIDI note 0..127)
+  toneSampleRef?: string | null; // reference key pointing to audio clip in IndexedDB
+  conditioningMode?: 'midi+audio' | 'audio-only'; // calibration mode ceiling
 }
+
+export interface ConditioningFrame {
+  pitchState: number[]; // 128-length array following General MIDI note numbering (-1=masked/unconditioned, 0=off, 1=sustain, 2=onset, 3=free play)
+  stylePrompt: string;  // derived from current tier
+  timestamp: number;    // frame timestamp (ms)
+  mode: 'midi+audio' | 'audio-only'; // live-gated mode
+}
+
+export type SidecarConnectionState = 'unavailable' | 'connecting' | 'connected' | 'high-latency';
+
+export interface SidecarStatus {
+  state: SidecarConnectionState;
+  roundTripMs?: number;
+}
+
 
 export interface MIDINoteEvent {
   pitch: number;      // MIDI pitch 0..127
@@ -44,6 +63,7 @@ export interface DSPMetrics {
   mode: OperatingMode;
   calibration: CalibrationData;
   timestamp: number;
+  wallClockTimestamp?: number;
   peakAmplitude?: number;
   // Stage 2 Monophonic Pitch Additions
   currentPitch?: number | null;     // MIDI note (e.g. 60 = C4)

@@ -33,11 +33,13 @@ import { CloudVibeToolbar } from '@/components/CloudVibeToolbar';
 import { CloudVibeSettingsModal } from '@/components/CloudVibeSettingsModal';
 import { DesktopDownloadBanner } from '@/components/DesktopDownloadBanner';
 import { StudioSettingsModal } from '@/components/StudioSettingsModal';
+import { ConditioningBridge } from '@/lib/audio/ConditioningBridge';
 
 export type Stage1SubView = 'welcome' | 'studio-hub' | 'midi-studio';
 
 export default function StudioHomePage() {
   const engineRef = useRef<AudioEngine | null>(null);
+  const bridgeRef = useRef<ConditioningBridge | null>(null);
 
   // App View Navigation State (Lands on Studio Hub by default)
   const [subView, setSubView] = useState<Stage1SubView>('studio-hub');
@@ -68,6 +70,12 @@ export default function StudioHomePage() {
     const engine = new AudioEngine();
     engineRef.current = engine;
 
+    const bridge = new ConditioningBridge({ debugMode: true });
+    bridgeRef.current = bridge;
+    bridge.start();
+    bridge.connect();
+    engine.setConditioningBridge(bridge);
+
     const unsubStatus = engine.subscribeStatus((st) => setStatus(st));
     const unsubMetrics = engine.subscribeMetrics((m) => setMetrics(m));
     const unsubLatency = engine.subscribeLatency(() => {
@@ -89,6 +97,7 @@ export default function StudioHomePage() {
       unsubAiMetrics();
       unsubAiLogs();
       unsubCloud();
+      bridge.stop();
       engine.destroy();
     };
   }, []);

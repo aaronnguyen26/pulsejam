@@ -4,6 +4,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { AudioEngine } from '@/lib/audio/AudioEngine';
 import { CalibrationData, DSPMetrics } from '@/lib/audio/types';
 import { useAudioSettingsStore } from '@/lib/state/audioSettingsStore';
+import { useCalibrationStore } from '@/lib/state/calibrationStore';
+import { saveToneSample } from '@/lib/audio/toneSampleStorage';
 
 interface RefinedCalibrationModalProps {
   isOpen: boolean;
@@ -59,6 +61,9 @@ export function RefinedCalibrationModal({
   const [loudDbResult, setLoudDbResult] = useState<number>(-12);
   const [confidenceScore, setConfidenceScore] = useState<number>(0);
   const [detectedNotesCount, setDetectedNotesCount] = useState<number>(0);
+  const [pitchRangeLowResult, setPitchRangeLowResult] = useState<number>(60);
+  const [pitchRangeHighResult, setPitchRangeHighResult] = useState<number>(60);
+  const [isVerifiedGateResult, setIsVerifiedGateResult] = useState<boolean>(false);
 
   // Subscribe to live audio engine DSP telemetry
   useEffect(() => {
@@ -221,9 +226,15 @@ export function RefinedCalibrationModal({
     setQuietDbResult(qDb);
     setLoudDbResult(lDb);
 
-    const uniquePitches = new Set(phraseNoteEventsRef.current);
+    const pitches = phraseNoteEventsRef.current;
+    const uniquePitches = new Set(pitches);
     const noteCount = uniquePitches.size;
     setDetectedNotesCount(noteCount);
+
+    const pitchLow = pitches.length > 0 ? Math.min(...pitches) : 60;
+    const pitchHigh = pitches.length > 0 ? Math.max(...pitches) : 60;
+    setPitchRangeLowResult(pitchLow);
+    setPitchRangeHighResult(pitchHigh);
 
     const validFrames = phrasePitchFramesRef.current;
     const avgClarity =
@@ -241,6 +252,7 @@ export function RefinedCalibrationModal({
     setConfidenceScore(totalScore);
 
     const passedGate = totalScore >= 60 && noteCount >= 2;
+    setIsVerifiedGateResult(passedGate);
 
     if (passedGate) {
       setStep('success');
@@ -256,18 +268,44 @@ export function RefinedCalibrationModal({
     setStep('phrase');
   };
 
-  const handleFinishCalibration = () => {
+  const handleFinishCalibration = async () => {
     const normalDb = Math.round((quietDbResult + loudDbResult) / 2);
+    let toneSampleKey: string | null = null;
+
+    if (audioEngine) {
+      try {
+        const snapshot = await audioEngine.getAudioSnapshot();
+        if (snapshot && snapshot.length > 0) {
+          toneSampleKey = `tone_sample_${Date.now()}`;
+          await saveToneSample(toneSampleKey, snapshot, 44100);
+        }
+      } catch (err) {
+        console.warn('Could not capture tone sample snapshot:', err);
+      }
+    }
+
+    const conditioningMode: 'midi+audio' | 'audio-only' = isVerifiedGateResult
+      ? 'midi+audio'
+      : 'audio-only';
+
     const finalCalibration: CalibrationData = {
       quietDb: quietDbResult,
       normalDb,
       loudDb: loudDbResult,
       onsetThreshold: 3.5,
       pitchConfidenceScore: confidenceScore,
-      isPitchVerified: true,
+      isPitchVerified: isVerifiedGateResult,
       calibratedAtGainDb: initialGainRef.current,
+      pitchRangeLow: pitchRangeLowResult,
+      pitchRangeHigh: pitchRangeHighResult,
+      toneSampleRef: toneSampleKey,
+      conditioningMode,
     };
 
+    // 1. Save numeric calibration data in Zustand localStorage store
+    useCalibrationStore.getState().setCalibration(finalCalibration);
+
+    // 2. Pass calibration to AudioEngine
     if (audioEngine) {
       audioEngine.setCalibration(finalCalibration);
     }

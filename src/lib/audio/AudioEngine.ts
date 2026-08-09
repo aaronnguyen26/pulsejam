@@ -21,6 +21,8 @@ import { MIDISynthEngine } from './MIDISynthEngine';
 import { AIGenerationEngine } from './AIGenerationEngine';
 import { LyriaSessionManager } from '../lyria/LyriaSessionManager';
 import { useAudioSettingsStore } from '../state/audioSettingsStore';
+import { useCalibrationStore } from '../state/calibrationStore';
+import { ConditioningBridge } from './ConditioningBridge';
 
 type MetricsCallback = (metrics: DSPMetrics) => void;
 type LatencyCallback = (entry: LatencyLogEntry) => void;
@@ -42,6 +44,8 @@ export class AudioEngine {
   private midiSynthEngine: MIDISynthEngine | null = null;
   private aiGenEngine: AIGenerationEngine | null = null;
   private lyriaManager: LyriaSessionManager | null = null;
+  private conditioningBridge: ConditioningBridge | null = null;
+  private pendingSnapshotResolver: ((samples: Float32Array) => void) | null = null;
 
   private currentAppMode: AppMode = 'stems';
   private currentProviderType: StemSourceType = 'synthetic';
@@ -137,6 +141,12 @@ export class AudioEngine {
           }
         }
       });
+
+      // Auto-restore persisted calibration data from Zustand store
+      const savedCal = useCalibrationStore.getState().calibration;
+      if (savedCal) {
+        this.setCalibration(savedCal);
+      }
 
       this.setStatus({ isInitialized: true, errorType: null, errorMessage: null });
       return true;
@@ -345,10 +355,35 @@ export class AudioEngine {
         payload: calibration,
       });
     }
+    if (this.conditioningBridge && calibration.conditioningMode) {
+      this.conditioningBridge.setCalibrationCeiling(calibration.conditioningMode);
+    }
   }
 
   public getActiveCalibration(): CalibrationData | null {
     return this.activeCalibration;
+  }
+
+  public setConditioningBridge(bridge: ConditioningBridge | null) {
+    this.conditioningBridge = bridge;
+    if (bridge && this.activeCalibration && this.activeCalibration.conditioningMode) {
+      bridge.setCalibrationCeiling(this.activeCalibration.conditioningMode);
+    }
+  }
+
+  public getConditioningBridge(): ConditioningBridge | null {
+    return this.conditioningBridge;
+  }
+
+  public getAudioSnapshot(): Promise<Float32Array> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) {
+        resolve(new Float32Array(0));
+        return;
+      }
+      this.pendingSnapshotResolver = resolve;
+      this.workletNode.port.postMessage({ type: 'GET_AUDIO_SNAPSHOT', requestId: Date.now() });
+    });
   }
 
   public setOperatingMode(mode: OperatingMode, overrideTier?: PerformanceTier) {
@@ -392,19 +427,43 @@ export class AudioEngine {
 
     if (data.type === 'DSP_METRICS') {
       const metrics = data.payload as DSPMetrics;
+      metrics.wallClockTimestamp = Date.now();
       this.notifyMetrics(metrics);
 
-      // 1. Forward buffered notes to Stage 2 AI Generation Engine
-      if (metrics.bufferedNotes && this.aiGenEngine) {
-        this.aiGenEngine.updateBufferedNotes(metrics.bufferedNotes as MIDINoteEvent[]);
+      // 1. Forward buffered notes & active tier to Stage 2 AI Generation Engine
+      if (this.aiGenEngine) {
+        if (metrics.bufferedNotes) {
+          this.aiGenEngine.updateBufferedNotes(metrics.bufferedNotes as MIDINoteEvent[]);
+        }
+        if (metrics.activeTier) {
+          this.aiGenEngine.setActiveTier(metrics.activeTier);
+        }
       }
 
       // 2. Forward live DSP telemetry to Stage 3 Cloud Vibe Session Manager
       if (this.lyriaManager) {
         this.lyriaManager.processDSPMetrics(metrics);
       }
+
+      // 3. Forward live DSP telemetry to Stage 1 ConditioningBridge
+      if (this.conditioningBridge) {
+        this.conditioningBridge.processMetrics(metrics);
+      }
+    } else if (data.type === 'AUDIO_SNAPSHOT') {
+      const payload = data.payload as { samples: Float32Array | number[] };
+      if (this.pendingSnapshotResolver) {
+        const samples =
+          payload.samples instanceof Float32Array
+            ? payload.samples
+            : new Float32Array(payload.samples);
+        this.pendingSnapshotResolver(samples);
+        this.pendingSnapshotResolver = null;
+      }
     } else if (data.type === 'TIER_CHANGE') {
       const event = data.payload as TierChangeEvent;
+      if (this.aiGenEngine && event.newTier) {
+        this.aiGenEngine.setActiveTier(event.newTier);
+      }
       if (this.stemEngine && this.currentAppMode === 'stems') {
         this.stemEngine.transitionToTier(event.newTier);
       }

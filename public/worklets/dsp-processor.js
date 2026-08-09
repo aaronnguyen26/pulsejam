@@ -60,6 +60,12 @@ class PulseJamDSPProcessor extends AudioWorkletProcessor {
     this.currentFrequency = null;
     this.pitchConfidence = 0;
 
+    // Stage 1 Redesign: Rolling Raw PCM Audio Buffer (~3 seconds)
+    const currentSR = typeof sampleRate !== 'undefined' ? sampleRate : 44100;
+    this.audioBufferSize = Math.floor(currentSR * 3);
+    this.audioRingBuffer = new Float32Array(this.audioBufferSize);
+    this.audioBufferIndex = 0;
+
     // Monophonic Note Event Tracker
     this.activeNote = null; // { pitch, velocity, startTime }
     this.recentNoteEvents = [];
@@ -92,6 +98,23 @@ class PulseJamDSPProcessor extends AudioWorkletProcessor {
         this.recentNoteEvents = [];
         this.activeNote = null;
         break;
+
+      case 'GET_AUDIO_SNAPSHOT': {
+        const snapshot = new Float32Array(this.audioBufferSize);
+        const tailLength = this.audioBufferSize - this.audioBufferIndex;
+        snapshot.set(this.audioRingBuffer.subarray(this.audioBufferIndex), 0);
+        snapshot.set(this.audioRingBuffer.subarray(0, this.audioBufferIndex), tailLength);
+        const currentSR = typeof sampleRate !== 'undefined' ? sampleRate : 44100;
+        this.port.postMessage({
+          type: 'AUDIO_SNAPSHOT',
+          payload: {
+            samples: snapshot,
+            sampleRate: currentSR,
+            requestId: data.requestId || null,
+          },
+        });
+        break;
+      }
     }
   }
 
@@ -212,6 +235,12 @@ class PulseJamDSPProcessor extends AudioWorkletProcessor {
       // Fill YIN ring buffer
       this.pitchRingBuffer[this.pitchBufferIndex] = sample;
       this.pitchBufferIndex = (this.pitchBufferIndex + 1) % this.pitchBufferSize;
+
+      // Fill rolling raw PCM audio buffer
+      if (this.audioRingBuffer) {
+        this.audioRingBuffer[this.audioBufferIndex] = sample;
+        this.audioBufferIndex = (this.audioBufferIndex + 1) % this.audioBufferSize;
+      }
     }
 
     const rms = Math.sqrt(sumSquares / bufferSize);
@@ -238,38 +267,47 @@ class PulseJamDSPProcessor extends AudioWorkletProcessor {
     // 4. YIN Monophonic Pitch Extraction & Note Event Tracker
     if (rawRmsDb > this.calibration.quietDb - 5) {
       const pitchResult = this.computeYINPitch(this.pitchRingBuffer, sampleRate);
-      if (pitchResult && pitchResult.confidence > 0.4) {
-        this.currentPitch = pitchResult.pitch;
-        this.currentFrequency = pitchResult.frequency;
+      if (pitchResult) {
         this.pitchConfidence = pitchResult.confidence;
+        if (pitchResult.confidence > 0.4) {
+          this.currentPitch = pitchResult.pitch;
+          this.currentFrequency = pitchResult.frequency;
 
-        // Monophonic Note Event Segmentation
-        const normalizedVel = Math.min(1, Math.max(0.1, (rawRmsDb + 60) / 60));
-        if (!this.activeNote) {
-          this.activeNote = {
-            pitch: pitchResult.pitch,
-            velocity: normalizedVel,
-            startTime: nowSec,
-          };
-        } else if (Math.abs(this.activeNote.pitch - pitchResult.pitch) >= 1) {
-          // Pitch changed -> finalize previous note and start new note
-          const duration = Math.max(0.05, nowSec - this.activeNote.startTime);
-          const completedNote = {
-            pitch: this.activeNote.pitch,
-            velocity: this.activeNote.velocity,
-            startTime: this.activeNote.startTime,
-            duration: duration,
-          };
-          this.recentNoteEvents.push(completedNote);
-          this.port.postMessage({ type: 'NOTE_EVENT', payload: completedNote });
+          // Monophonic Note Event Segmentation
+          const normalizedVel = Math.min(1, Math.max(0.1, (rawRmsDb + 60) / 60));
+          if (!this.activeNote) {
+            this.activeNote = {
+              pitch: pitchResult.pitch,
+              velocity: normalizedVel,
+              startTime: nowSec,
+            };
+          } else if (Math.abs(this.activeNote.pitch - pitchResult.pitch) >= 1) {
+            // Pitch changed -> finalize previous note and start new note
+            const duration = Math.max(0.05, nowSec - this.activeNote.startTime);
+            const completedNote = {
+              pitch: this.activeNote.pitch,
+              velocity: this.activeNote.velocity,
+              startTime: this.activeNote.startTime,
+              duration: duration,
+            };
+            this.recentNoteEvents.push(completedNote);
+            this.port.postMessage({ type: 'NOTE_EVENT', payload: completedNote });
 
-          this.activeNote = {
-            pitch: pitchResult.pitch,
-            velocity: normalizedVel,
-            startTime: nowSec,
-          };
+            this.activeNote = {
+              pitch: pitchResult.pitch,
+              velocity: normalizedVel,
+              startTime: nowSec,
+            };
+          }
+        } else {
+          this.currentPitch = null;
+          this.currentFrequency = null;
+          this.finalizeActiveNote(nowSec);
         }
       } else {
+        this.pitchConfidence = 0;
+        this.currentPitch = null;
+        this.currentFrequency = null;
         this.finalizeActiveNote(nowSec);
       }
     } else {
