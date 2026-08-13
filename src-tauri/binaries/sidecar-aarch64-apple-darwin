@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# PulseJam Stage 3 - Embedded Python MRT2 Sidecar Wrapper
+# Registered as Tauri externalBin; spawned and terminated by Tauri app lifecycle.
+# Uses exec so the Python process replaces this shell - Tauri's kill hits the
+# Python PID directly, no orphaned child process when Tauri terminates this sidecar.
+#
+# BUNDLE VS DEV RESOLUTION:
+# - Production (.app bundle): SCRIPT_DIR contains "Contents/MacOS" -> uses embedded
+#   Python runtime in Contents/Resources
+# - Dev (tauri dev / direct invoke): SCRIPT_DIR is src-tauri/binaries/ -> always
+#   uses local venv or PULSEJAM_ROOT, even if src-tauri/resources/ exists on disk.
+
+set -e
+
+# Resolve absolute path to this script
+if command -v realpath >/dev/null 2>&1; then
+    SELF="$(realpath "$0")"
+elif [ -L "$0" ]; then
+    SELF="$(readlink -f "$0")"
+else
+    SELF="$0"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+# In .app bundle: SCRIPT_DIR is <App>.app/Contents/MacOS
+RESOURCES_DIR="$(cd "$SCRIPT_DIR/../Resources" && pwd 2>/dev/null || true)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd 2>/dev/null || true)"
+
+# Detect whether we are actually inside a macOS .app bundle.
+# Only trust embedded Python when path contains Contents/MacOS — never in the
+# dev workspace where src-tauri/binaries/ would resolve ../Resources to the
+# source-tree src-tauri/resources/ on case-insensitive APFS.
+case "$SCRIPT_DIR" in
+    */Contents/MacOS) IS_APP_BUNDLE=1 ;;
+    *)                IS_APP_BUNDLE=0 ;;
+esac
+
+# Bundle locations (only evaluated when IS_APP_BUNDLE=1)
+BUNDLE_PYTHON_1="$RESOURCES_DIR/resources/python-runtime/bin/python3"
+BUNDLE_SIDECAR_1="$RESOURCES_DIR/resources/scripts/sidecar/sidecar_server.py"
+
+BUNDLE_PYTHON_2="$RESOURCES_DIR/python-runtime/bin/python3"
+BUNDLE_SIDECAR_2="$RESOURCES_DIR/scripts/sidecar/sidecar_server.py"
+
+# Dev fallbacks
+if [ -n "$PULSEJAM_ROOT" ]; then
+    DEV_PYTHON="$PULSEJAM_ROOT/experiments/mrt2-sanity-check/venv/bin/python"
+    DEV_SIDECAR="$PULSEJAM_ROOT/scripts/sidecar/sidecar_server.py"
+else
+    DEV_PYTHON="$PROJECT_ROOT/experiments/mrt2-sanity-check/venv/bin/python"
+    DEV_SIDECAR="$PROJECT_ROOT/scripts/sidecar/sidecar_server.py"
+fi
+
+# Path Selection
+if [ "$IS_APP_BUNDLE" = "1" ] && [ -z "$PULSEJAM_ROOT" ] && [ -f "$BUNDLE_PYTHON_1" ] && [ -f "$BUNDLE_SIDECAR_1" ]; then
+    PYTHON_BIN="$BUNDLE_PYTHON_1"
+    SIDECAR_SCRIPT="$BUNDLE_SIDECAR_1"
+    MODE="embedded bundle (Resources/resources)"
+elif [ "$IS_APP_BUNDLE" = "1" ] && [ -z "$PULSEJAM_ROOT" ] && [ -f "$BUNDLE_PYTHON_2" ] && [ -f "$BUNDLE_SIDECAR_2" ]; then
+    PYTHON_BIN="$BUNDLE_PYTHON_2"
+    SIDECAR_SCRIPT="$BUNDLE_SIDECAR_2"
+    MODE="embedded bundle (Resources)"
+elif [ -f "$DEV_PYTHON" ] && [ -f "$DEV_SIDECAR" ]; then
+    PYTHON_BIN="$DEV_PYTHON"
+    SIDECAR_SCRIPT="$DEV_SIDECAR"
+    MODE="dev fallback venv"
+else
+    echo "[sidecar-wrapper] ERROR: Could not locate Python runtime or sidecar_server.py script." >&2
+    echo "[sidecar-wrapper] IS_APP_BUNDLE=$IS_APP_BUNDLE" >&2
+    echo "[sidecar-wrapper] Tried BUNDLE_PYTHON_1=$BUNDLE_PYTHON_1" >&2
+    echo "[sidecar-wrapper] Tried BUNDLE_PYTHON_2=$BUNDLE_PYTHON_2" >&2
+    echo "[sidecar-wrapper] Tried DEV_PYTHON=$DEV_PYTHON" >&2
+    exit 1
+fi
+
+echo "[sidecar-wrapper] MODE: $MODE" >&2
+echo "[sidecar-wrapper] PYTHON_BIN: $PYTHON_BIN" >&2
+echo "[sidecar-wrapper] SIDECAR_SCRIPT: $SIDECAR_SCRIPT" >&2
+echo "[sidecar-wrapper] Starting PulseJam MRT2 sidecar..." >&2
+
+exec "$PYTHON_BIN" -u "$SIDECAR_SCRIPT"

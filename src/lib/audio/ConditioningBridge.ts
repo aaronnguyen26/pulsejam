@@ -13,6 +13,8 @@ import {
   SidecarConnectionState,
   SidecarStatus,
 } from './types';
+import { AIAudioReceiver } from './AIAudioReceiver';
+
 
 export interface ConditioningBridgeOptions {
   wsUrl?: string;
@@ -66,6 +68,9 @@ export class ConditioningBridge {
   private pingTimestamp: number | null = null;
   private reconnectDelayMs = 2000;
   private maxReconnectDelayMs = 30000;
+  private aiAudioReceiver: AIAudioReceiver | null = null;
+  private receivedAudioSeq = 0;
+
 
   // Timer & Subscribers
   private tickTimer: ReturnType<typeof setInterval> | null = null;
@@ -106,6 +111,15 @@ export class ConditioningBridge {
       this.currentLiveMode = 'audio-only';
     }
   }
+
+  public setAIAudioReceiver(receiver: AIAudioReceiver | null) {
+    this.aiAudioReceiver = receiver;
+  }
+
+  public getAIAudioReceiver(): AIAudioReceiver | null {
+    return this.aiAudioReceiver;
+  }
+
 
   public processMetrics(metrics: DSPMetrics) {
     this.latestMetrics = metrics;
@@ -235,18 +249,36 @@ export class ConditioningBridge {
 
       this.socket.onmessage = (event) => {
         try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'pong' && this.pingTimestamp) {
-            const rtt = Date.now() - this.pingTimestamp;
-            const state: SidecarConnectionState =
-              rtt > this.latencyThresholdMs ? 'high-latency' : 'connected';
-            this.reconnectDelayMs = 2000;
-            this.setStatus({ state, roundTripMs: rtt });
+          if (typeof event.data === 'string') {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'pong' && this.pingTimestamp) {
+              const rtt = Date.now() - this.pingTimestamp;
+              const state: SidecarConnectionState =
+                rtt > this.latencyThresholdMs ? 'high-latency' : 'connected';
+              this.reconnectDelayMs = 2000;
+              this.setStatus({ state, roundTripMs: rtt });
+            } else if (msg.type === 'AUDIO_CHUNK' || msg.type === 'AUDIO_FRAME' || msg.type === 'audio') {
+              if (this.aiAudioReceiver) {
+                const seq = msg.sequenceNumber ?? msg.seq ?? this.receivedAudioSeq++;
+                this.aiAudioReceiver.pushChunk(msg.pcmData || msg.audio || msg.data, seq, msg.timestamp);
+              }
+            }
+          } else if (event.data instanceof ArrayBuffer) {
+            if (this.aiAudioReceiver) {
+              this.aiAudioReceiver.pushChunk(event.data, this.receivedAudioSeq++);
+            }
+          } else if (typeof Blob !== 'undefined' && event.data instanceof Blob) {
+            event.data.arrayBuffer().then((ab) => {
+              if (this.aiAudioReceiver) {
+                this.aiAudioReceiver.pushChunk(ab, this.receivedAudioSeq++);
+              }
+            });
           }
         } catch {
-          // ignore non-json messages
+          // ignore malformed messages
         }
       };
+
 
       this.socket.onerror = () => {
         this.setStatus({ state: 'unavailable' });

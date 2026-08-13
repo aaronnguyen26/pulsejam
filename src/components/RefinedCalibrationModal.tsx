@@ -65,9 +65,17 @@ export function RefinedCalibrationModal({
   const [pitchRangeHighResult, setPitchRangeHighResult] = useState<number>(60);
   const [isVerifiedGateResult, setIsVerifiedGateResult] = useState<boolean>(false);
 
+  // Ensure microphone is active when calibration modal opens
+  useEffect(() => {
+    if (isOpen && audioEngine && !audioEngine.getStatus().isMicActive) {
+      audioEngine.startMicrophone();
+    }
+  }, [isOpen, audioEngine]);
+
   // Subscribe to live audio engine DSP telemetry
   useEffect(() => {
     if (!isOpen || !audioEngine) return;
+
 
     const unsubscribe = audioEngine.subscribeMetrics((metrics: DSPMetrics) => {
       const now = Date.now();

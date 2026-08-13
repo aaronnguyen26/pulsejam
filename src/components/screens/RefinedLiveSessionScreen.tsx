@@ -166,8 +166,8 @@ export function RefinedLiveSessionScreen({
 
         // Record stream via MediaRecorder if available
         try {
-          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const stream = audioEngine.getMicStream();
+          if (stream && typeof MediaRecorder !== 'undefined') {
             const recorder = new MediaRecorder(stream);
             recordedChunksRef.current = [];
 
@@ -189,6 +189,7 @@ export function RefinedLiveSessionScreen({
         } catch {
           // Stream recorded internally
         }
+
       }
     } else {
       // Stop Recording

@@ -1,14 +1,11 @@
 import {
-  AIGenerationLogEntry,
-  AIGenerationMetrics,
+  AIAudioStreamMetrics,
   AppMode,
   AudioEngineStatus,
   AudioErrorType,
   CalibrationData,
-  CloudVibeMetrics,
   DSPMetrics,
   LatencyLogEntry,
-  MIDINoteEvent,
   OperatingMode,
   PerformanceTier,
   StemSourceType,
@@ -17,9 +14,7 @@ import {
 
 import { StemEngine } from './StemEngine';
 import { FileStemProvider, SyntheticStemProvider } from './StemProviders';
-import { MIDISynthEngine } from './MIDISynthEngine';
-import { AIGenerationEngine } from './AIGenerationEngine';
-import { LyriaSessionManager } from '../lyria/LyriaSessionManager';
+import { AIAudioReceiver } from './AIAudioReceiver';
 import { useAudioSettingsStore } from '../state/audioSettingsStore';
 import { useCalibrationStore } from '../state/calibrationStore';
 import { ConditioningBridge } from './ConditioningBridge';
@@ -27,9 +22,7 @@ import { ConditioningBridge } from './ConditioningBridge';
 type MetricsCallback = (metrics: DSPMetrics) => void;
 type LatencyCallback = (entry: LatencyLogEntry) => void;
 type StatusCallback = (status: AudioEngineStatus) => void;
-type AIGenMetricsCallback = (metrics: AIGenerationMetrics) => void;
-type AIGenLogCallback = (entry: AIGenerationLogEntry) => void;
-type CloudVibeMetricsCallback = (metrics: CloudVibeMetrics) => void;
+type AIAudioMetricsCallback = (metrics: AIAudioStreamMetrics) => void;
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -40,10 +33,16 @@ export class AudioEngine {
   private workletNode: AudioWorkletNode | null = null;
   private activeCalibration: CalibrationData | null = null;
 
+  // Stage 1 Stem Engine
   private stemEngine: StemEngine | null = null;
-  private midiSynthEngine: MIDISynthEngine | null = null;
-  private aiGenEngine: AIGenerationEngine | null = null;
-  private lyriaManager: LyriaSessionManager | null = null;
+
+  // Stage 2 MRT2 AI Audio Stream Receiver & Mixer Nodes
+  private aiAudioReceiver: AIAudioReceiver;
+  private micGainNode: GainNode | null = null;
+  private micCompressorNode: DynamicsCompressorNode | null = null;
+  private aiGainNode: GainNode | null = null;
+  private masterGainNode: GainNode | null = null;
+
   private conditioningBridge: ConditioningBridge | null = null;
   private pendingSnapshotResolver: ((samples: Float32Array) => void) | null = null;
 
@@ -60,13 +59,16 @@ export class AudioEngine {
   private metricsListeners: Set<MetricsCallback> = new Set();
   private latencyListeners: Set<LatencyCallback> = new Set();
   private statusListeners: Set<StatusCallback> = new Set();
-  private aiGenMetricsListeners: Set<AIGenMetricsCallback> = new Set();
-  private aiGenLogListeners: Set<AIGenLogCallback> = new Set();
-  private cloudVibeListeners: Set<CloudVibeMetricsCallback> = new Set();
+  private aiAudioMetricsListeners: Set<AIAudioMetricsCallback> = new Set();
 
   private latencyHistory: LatencyLogEntry[] = [];
 
-  constructor() {}
+  constructor() {
+    this.aiAudioReceiver = new AIAudioReceiver();
+    this.aiAudioReceiver.subscribeMetrics((metrics) => {
+      this.aiAudioMetricsListeners.forEach((cb) => cb(metrics));
+    });
+  }
 
   public async initialize(stemSource: StemSourceType = 'synthetic'): Promise<boolean> {
     this.currentProviderType = stemSource;
@@ -93,26 +95,40 @@ export class AudioEngine {
       this.stemEngine = new StemEngine(this.ctx);
       await this.loadStems(stemSource);
 
-      // 2. Initialize Stage 2 MIDI Synth & AI Generation Engines
-      this.midiSynthEngine = new MIDISynthEngine(this.ctx);
-      this.aiGenEngine = new AIGenerationEngine(this.ctx, this.midiSynthEngine);
+      // 2. Setup Stage 2 Mixer Stage (Master, Mic Mix Gain, AI Mix Gain, DynamicsCompressor Safety Limiter)
+      this.masterGainNode = this.ctx.createGain();
+      this.micGainNode = this.ctx.createGain();
+      this.micCompressorNode = this.ctx.createDynamicsCompressor();
+      this.aiGainNode = this.ctx.createGain();
 
-      this.aiGenEngine.subscribeMetrics((metrics) => {
-        this.aiGenMetricsListeners.forEach((cb) => cb(metrics));
-      });
-      this.aiGenEngine.subscribeLogs((entry) => {
-        this.aiGenLogListeners.forEach((cb) => cb(entry));
-      });
+      this.masterGainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      // Default live mic monitoring gain to 0.0 (silent) on session start to avoid feedback
+      this.micGainNode.gain.value = 0.0;
+      this.micGainNode.gain.setValueAtTime(0.0, this.ctx.currentTime);
+      this.aiGainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
 
-      await this.aiGenEngine.initializeWorker();
 
-      // 3. Initialize Stage 3 Cloud Vibe Session Manager
-      this.lyriaManager = new LyriaSessionManager(this.ctx);
-      this.lyriaManager.subscribeStatus((metrics) => {
-        this.cloudVibeListeners.forEach((cb) => cb(metrics));
-      });
+      // DynamicsCompressor safety ceiling limiter tuned near 0dBFS (-2.0dB threshold, 2.0dB knee, 20:1 ratio)
+      this.micCompressorNode.threshold.setValueAtTime(-2.0, this.ctx.currentTime);
+      this.micCompressorNode.knee.setValueAtTime(2.0, this.ctx.currentTime);
+      this.micCompressorNode.ratio.setValueAtTime(20, this.ctx.currentTime);
+      this.micCompressorNode.attack.setValueAtTime(0.003, this.ctx.currentTime);
+      this.micCompressorNode.release.setValueAtTime(0.1, this.ctx.currentTime);
 
-      // 4. Load AudioWorklet Processor Module
+
+
+      this.micGainNode.connect(this.micCompressorNode);
+      this.micCompressorNode.connect(this.masterGainNode);
+      this.aiGainNode.connect(this.masterGainNode);
+      this.masterGainNode.connect(this.ctx.destination);
+
+      // Initialize Stage 2 AIAudioReceiver WebAudio AudioWorklet
+      const aiWorklet = await this.aiAudioReceiver.initializeAudioWorklet(this.ctx);
+      if (aiWorklet) {
+        aiWorklet.connect(this.aiGainNode);
+      }
+
+      // 3. Load AudioWorklet Processor Module for DSP
       await this.ctx.audioWorklet.addModule('/worklets/dsp-processor.js');
 
       // 5. Instantiate AudioWorkletNode
@@ -158,6 +174,10 @@ export class AudioEngine {
   }
 
   public async startMicrophone(): Promise<boolean> {
+    if (this.status.isMicActive && this.micStream && this.micSourceNode) {
+      return true;
+    }
+
     if (!this.ctx || !this.workletNode) {
       this.setError('INITIALIZATION_FAILED', 'AudioEngine must be initialized before starting microphone.');
       return false;
@@ -167,7 +187,6 @@ export class AudioEngine {
       await this.ctx.resume();
     }
 
-    // Read current settings from store
     const settings = useAudioSettingsStore.getState();
     const isAcoustic = settings.inputMode === 'acoustic';
 
@@ -190,24 +209,31 @@ export class AudioEngine {
       this.micStream = await navigator.mediaDevices.getUserMedia(constraints);
       this.micSourceNode = this.ctx.createMediaStreamSource(this.micStream);
 
-      // 1. GainNode (Input Gain Control)
+      // GainNode & BiquadFilterNode (Stage 1 DSP path)
       this.gainNode = this.ctx.createGain();
       const linearGain = Math.max(0, Math.pow(10, settings.inputGainDb / 20));
       this.gainNode.gain.setValueAtTime(linearGain, this.ctx.currentTime);
 
-      // 2. BiquadFilterNode (Low Cut Filter - Highpass ~80Hz)
       this.biquadFilterNode = this.ctx.createBiquadFilter();
       this.biquadFilterNode.type = 'highpass';
       this.biquadFilterNode.frequency.setValueAtTime(settings.lowCutFilter ? 80 : 0, this.ctx.currentTime);
 
-      // 3. Connect Chain: micSource -> gainNode -> biquadFilterNode -> workletNode
+      // Stage 1 DSP Path (silent, drives worklet processing clock):
+      // micSourceNode -> gainNode (inputGainDb) -> biquadFilterNode -> workletNode -> dummyGain(0.0) -> destination
       this.micSourceNode.connect(this.gainNode);
       this.gainNode.connect(this.biquadFilterNode);
       this.biquadFilterNode.connect(this.workletNode);
 
+      // Live Monitoring Path (taps micSourceNode directly BEFORE inputGainDb):
+      // micSourceNode -> micGainNode (default 0.0) -> micCompressorNode (limiter) -> masterGainNode -> destination
+      if (this.micGainNode) {
+        this.micSourceNode.connect(this.micGainNode);
+      }
+
       this.setStatus({ isMicActive: true, errorType: null, errorMessage: null });
       return true;
     } catch (err: unknown) {
+
       const errorName = err && typeof err === 'object' && 'name' in err ? String(err.name) : '';
       const errorMsg = err instanceof Error ? err.message : String(err);
 
@@ -229,7 +255,6 @@ export class AudioEngine {
       const linearGain = Math.max(0, Math.pow(10, db / 20));
       this.gainNode.gain.setValueAtTime(linearGain, this.ctx.currentTime);
 
-      // Auto-derive quietDb / loudDb thresholds when gain changes after calibration
       if (this.activeCalibration && typeof this.activeCalibration.calibratedAtGainDb === 'number') {
         const gainDelta = db - this.activeCalibration.calibratedAtGainDb;
         const adjustedQuiet = Math.min(-15, Math.max(-75, Math.round(this.activeCalibration.quietDb + gainDelta)));
@@ -255,6 +280,46 @@ export class AudioEngine {
     if (this.biquadFilterNode && this.ctx) {
       this.biquadFilterNode.frequency.setValueAtTime(enabled ? 80 : 0, this.ctx.currentTime);
     }
+  }
+
+  // ─── Stage 2 Mixer Gain Controls ──────────────────────────────────────────
+
+  public setMicMixGain(gain: number) {
+    if (this.micGainNode && this.ctx) {
+      const val = Math.max(0, gain);
+      this.micGainNode.gain.value = val;
+      this.micGainNode.gain.setValueAtTime(val, this.ctx.currentTime);
+    }
+  }
+
+  public setAIAudioMixGain(gain: number) {
+    if (this.aiGainNode && this.ctx) {
+      const val = Math.max(0, gain);
+      this.aiGainNode.gain.value = val;
+      this.aiGainNode.gain.setValueAtTime(val, this.ctx.currentTime);
+    }
+  }
+
+  public setMasterGain(gain: number) {
+    if (this.masterGainNode && this.ctx) {
+      const val = Math.max(0, gain);
+      this.masterGainNode.gain.value = val;
+      this.masterGainNode.gain.setValueAtTime(val, this.ctx.currentTime);
+    }
+  }
+
+
+  public getMicMixGain(): number {
+    return this.micGainNode?.gain.value ?? 0.0;
+  }
+
+
+  public getAIAudioMixGain(): number {
+    return this.aiGainNode?.gain.value ?? 1.0;
+  }
+
+  public getMasterGain(): number {
+    return this.masterGainNode?.gain.value ?? 1.0;
   }
 
   public async restartMicrophone(): Promise<boolean> {
@@ -290,10 +355,6 @@ export class AudioEngine {
       this.stemEngine.stop();
     }
 
-    if (this.aiGenEngine) {
-      this.aiGenEngine.stop();
-    }
-
     this.setStatus({ isMicActive: false });
   }
 
@@ -301,29 +362,19 @@ export class AudioEngine {
     return this.micStream;
   }
 
-  public getAIGenerationEngine(): AIGenerationEngine | null {
-    return this.aiGenEngine;
-  }
-
-  public getMIDISynthEngine(): MIDISynthEngine | null {
-    return this.midiSynthEngine;
+  public getAIAudioReceiver(): AIAudioReceiver {
+    return this.aiAudioReceiver;
   }
 
   public setAppMode(appMode: AppMode) {
     this.currentAppMode = appMode;
 
     if (appMode === 'stems') {
-      if (this.aiGenEngine) this.aiGenEngine.stop();
-      if (this.midiSynthEngine) this.midiSynthEngine.setMuted(true);
       if (this.stemEngine && this.status.isMicActive) {
         this.stemEngine.start();
       }
     } else if (appMode === 'ai-gen') {
       if (this.stemEngine) this.stemEngine.stop();
-      if (this.midiSynthEngine) this.midiSynthEngine.setMuted(false);
-      if (this.aiGenEngine && this.status.isMicActive) {
-        this.aiGenEngine.start();
-      }
     }
   }
 
@@ -366,8 +417,11 @@ export class AudioEngine {
 
   public setConditioningBridge(bridge: ConditioningBridge | null) {
     this.conditioningBridge = bridge;
-    if (bridge && this.activeCalibration && this.activeCalibration.conditioningMode) {
-      bridge.setCalibrationCeiling(this.activeCalibration.conditioningMode);
+    if (bridge) {
+      bridge.setAIAudioReceiver(this.aiAudioReceiver);
+      if (this.activeCalibration && this.activeCalibration.conditioningMode) {
+        bridge.setCalibrationCeiling(this.activeCalibration.conditioningMode);
+      }
     }
   }
 
@@ -398,30 +452,6 @@ export class AudioEngine {
     }
   }
 
-  // ─── Stage 3 Cloud Vibe API Methods ─────────────────────────────────────
-
-  public async startCloudVibe(): Promise<boolean> {
-    if (!this.lyriaManager) return false;
-    return await this.lyriaManager.start();
-  }
-
-  public stopCloudVibe() {
-    if (this.lyriaManager) {
-      this.lyriaManager.stop();
-    }
-  }
-
-  public setCloudVibeVolume(vol: number) {
-    if (this.lyriaManager) {
-      this.lyriaManager.setVolume(vol);
-    }
-  }
-
-  public subscribeCloudVibe(cb: CloudVibeMetricsCallback): () => void {
-    this.cloudVibeListeners.add(cb);
-    return () => this.cloudVibeListeners.delete(cb);
-  }
-
   private handleWorkletMessage(data: { type: string; payload: unknown }) {
     if (!data || !data.type) return;
 
@@ -430,22 +460,6 @@ export class AudioEngine {
       metrics.wallClockTimestamp = Date.now();
       this.notifyMetrics(metrics);
 
-      // 1. Forward buffered notes & active tier to Stage 2 AI Generation Engine
-      if (this.aiGenEngine) {
-        if (metrics.bufferedNotes) {
-          this.aiGenEngine.updateBufferedNotes(metrics.bufferedNotes as MIDINoteEvent[]);
-        }
-        if (metrics.activeTier) {
-          this.aiGenEngine.setActiveTier(metrics.activeTier);
-        }
-      }
-
-      // 2. Forward live DSP telemetry to Stage 3 Cloud Vibe Session Manager
-      if (this.lyriaManager) {
-        this.lyriaManager.processDSPMetrics(metrics);
-      }
-
-      // 3. Forward live DSP telemetry to Stage 1 ConditioningBridge
       if (this.conditioningBridge) {
         this.conditioningBridge.processMetrics(metrics);
       }
@@ -461,9 +475,6 @@ export class AudioEngine {
       }
     } else if (data.type === 'TIER_CHANGE') {
       const event = data.payload as TierChangeEvent;
-      if (this.aiGenEngine && event.newTier) {
-        this.aiGenEngine.setActiveTier(event.newTier);
-      }
       if (this.stemEngine && this.currentAppMode === 'stems') {
         this.stemEngine.transitionToTier(event.newTier);
       }
@@ -491,10 +502,6 @@ export class AudioEngine {
     this.latencyHistory = [];
   }
 
-  public clearAIGenLogs() {
-    if (this.aiGenEngine) this.aiGenEngine.clearLogs();
-  }
-
   public subscribeMetrics(cb: MetricsCallback): () => void {
     this.metricsListeners.add(cb);
     return () => this.metricsListeners.delete(cb);
@@ -511,14 +518,9 @@ export class AudioEngine {
     return () => this.statusListeners.delete(cb);
   }
 
-  public subscribeAIGenMetrics(cb: AIGenMetricsCallback): () => void {
-    this.aiGenMetricsListeners.add(cb);
-    return () => this.aiGenMetricsListeners.delete(cb);
-  }
-
-  public subscribeAIGenLogs(cb: AIGenLogCallback): () => void {
-    this.aiGenLogListeners.add(cb);
-    return () => this.aiGenLogListeners.delete(cb);
+  public subscribeAIAudioMetrics(cb: AIAudioMetricsCallback): () => void {
+    this.aiAudioMetricsListeners.add(cb);
+    return () => this.aiAudioMetricsListeners.delete(cb);
   }
 
   private notifyMetrics(metrics: DSPMetrics) {
@@ -552,18 +554,12 @@ export class AudioEngine {
 
   public destroy() {
     this.stopMicrophone();
-    this.stopCloudVibe();
     if (this.ctx) {
       this.ctx.close();
       this.ctx = null;
     }
-    if (this.aiGenEngine) {
-      this.aiGenEngine.destroy();
-      this.aiGenEngine = null;
-    }
+    this.aiAudioReceiver.reset();
     this.workletNode = null;
     this.stemEngine = null;
-    this.midiSynthEngine = null;
-    this.lyriaManager = null;
   }
 }

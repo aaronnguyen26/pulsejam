@@ -50,7 +50,7 @@ The system is engineered as a zero-latency single codebase that targets both hig
                                                  │
                                                  ▼
                      ┌────────────────────────────────────────────────────────┐
-                     │             Stage 4: Tauri Native macOS App            │
+                     │             Stage 3: Tauri Native macOS App            │
                      │     Unsigned .dmg / Hardware Microphone / CSP          │
                      └────────────────────────────────────────────────────────┘
 ```
@@ -168,10 +168,10 @@ Stage 3 adds an expansive, atmospheric cloud layer to the local audio session. P
 
 ---
 
-### Stage 4: Native Standalone macOS Desktop Application (`Tauri Integration`)
+### Stage 3: Native Standalone macOS Desktop Application (`Tauri Integration`)
 
 #### 1. Stage Overview & Objectives
-Stage 4 packages the entire web application into a lightweight, native macOS desktop executable (`.dmg` installer) using Tauri, providing low-overhead system hardware access, offline execution, and a dedicated desktop window.
+Stage 3 packages the entire web application into a lightweight, native macOS desktop executable (`.dmg` installer) using Tauri, providing low-overhead system hardware access, offline execution, and a dedicated desktop window.
 
 #### 2. Built Features & Technical Implementation
 - **Tauri Integration Core (`src-tauri/`)**:

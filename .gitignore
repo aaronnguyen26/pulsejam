@@ -40,8 +40,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# tauri
-src-tauri/target
+# tauri & embedded runtime
+src-tauri/target/
+src-tauri/resources/
+build/
+*.dmg
+*.app
 
 # experiments
 experiments/

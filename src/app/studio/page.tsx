@@ -4,18 +4,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AudioEngine } from '@/lib/audio/AudioEngine';
 import {
-  AIGenerationLogEntry,
-  AIGenerationMetrics,
+  AIAudioStreamMetrics,
   AppMode,
   AudioEngineStatus,
   CalibrationData,
-  CloudVibeMetrics,
   DSPMetrics,
   LatencyLogEntry,
   OperatingMode,
   PerformanceTier,
+  SidecarStatus,
   StemSourceType,
 } from '@/lib/audio/types';
+
 
 import { ImmersiveWelcomeHomeScreen } from '@/components/screens/ImmersiveWelcomeHomeScreen';
 import { StudioHubRefinedScreen } from '@/components/screens/StudioHubRefinedScreen';
@@ -29,8 +29,6 @@ import { StatusBanner } from '@/components/StatusBanner';
 import { ModeToggle } from '@/components/ModeToggle';
 import { LatencyMonitor } from '@/components/LatencyMonitor';
 import { AIGenerationMonitor } from '@/components/AIGenerationMonitor';
-import { CloudVibeToolbar } from '@/components/CloudVibeToolbar';
-import { CloudVibeSettingsModal } from '@/components/CloudVibeSettingsModal';
 import { DesktopDownloadBanner } from '@/components/DesktopDownloadBanner';
 import { StudioSettingsModal } from '@/components/StudioSettingsModal';
 import { ConditioningBridge } from '@/lib/audio/ConditioningBridge';
@@ -45,7 +43,7 @@ export default function StudioHomePage() {
   const [subView, setSubView] = useState<Stage1SubView>('studio-hub');
   const [isCalibrating, setIsCalibrating] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [isCloudSettingsOpen, setIsCloudSettingsOpen] = useState(false);
+
 
   // Audio Engine Subscriptions & Telemetry
   const [status, setStatus] = useState<AudioEngineStatus>({
@@ -57,9 +55,9 @@ export default function StudioHomePage() {
 
   const [metrics, setMetrics] = useState<DSPMetrics | null>(null);
   const [latencyLogs, setLatencyLogs] = useState<LatencyLogEntry[]>([]);
-  const [aiMetrics, setAiMetrics] = useState<AIGenerationMetrics | null>(null);
-  const [aiLogs, setAiLogs] = useState<AIGenerationLogEntry[]>([]);
-  const [cloudMetrics, setCloudMetrics] = useState<CloudVibeMetrics | null>(null);
+  const [aiStreamMetrics, setAiStreamMetrics] = useState<AIAudioStreamMetrics | null>(null);
+  const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus | null>(null);
+
 
   const [appMode, setAppMode] = useState<AppMode>('stems');
   const [stemSource, setStemSource] = useState<StemSourceType>('synthetic');
@@ -81,11 +79,8 @@ export default function StudioHomePage() {
     const unsubLatency = engine.subscribeLatency(() => {
       setLatencyLogs(engine.getLatencyHistory());
     });
-    const unsubAiMetrics = engine.subscribeAIGenMetrics((m) => setAiMetrics(m));
-    const unsubAiLogs = engine.subscribeAIGenLogs((entry) => {
-      setAiLogs((prev) => [entry, ...prev].slice(0, 10));
-    });
-    const unsubCloud = engine.subscribeCloudVibe((m) => setCloudMetrics(m));
+    const unsubAiStream = engine.subscribeAIAudioMetrics((m) => setAiStreamMetrics(m));
+    const unsubSidecar = bridge.subscribeSidecarStatus((st) => setSidecarStatus(st));
 
     // Initialize audio engine on client mount
     engine.initialize(stemSource);
@@ -94,13 +89,13 @@ export default function StudioHomePage() {
       unsubStatus();
       unsubMetrics();
       unsubLatency();
-      unsubAiMetrics();
-      unsubAiLogs();
-      unsubCloud();
+      unsubAiStream();
+      unsubSidecar();
       bridge.stop();
       engine.destroy();
     };
   }, []);
+
 
   const handleStartSession = () => {
     setIsCalibrating(true);
@@ -150,14 +145,6 @@ export default function StudioHomePage() {
     }
   };
 
-  const handleToggleCloudVibe = async () => {
-    if (!engineRef.current) return;
-    if (cloudMetrics?.status === 'CONNECTED' || cloudMetrics?.status === 'ROTATING') {
-      engineRef.current.stopCloudVibe();
-    } else {
-      await engineRef.current.startCloudVibe();
-    }
-  };
 
   const activeTier: PerformanceTier =
     operatingMode === 'OVERRIDE' ? overrideTier : metrics?.activeTier || 'chill';
@@ -245,16 +232,6 @@ export default function StudioHomePage() {
         audioEngine={engineRef.current}
       />
 
-      {/* Cloud Vibe Settings Modal */}
-      <CloudVibeSettingsModal
-        isOpen={isCloudSettingsOpen}
-        onClose={() => setIsCloudSettingsOpen(false)}
-        onKeySaved={() => {
-          if (engineRef.current) {
-            setCloudMetrics((prev) => (prev ? { ...prev, hasApiKey: true } : null));
-          }
-        }}
-      />
     </div>
   );
 }

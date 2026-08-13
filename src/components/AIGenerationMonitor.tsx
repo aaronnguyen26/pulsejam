@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AIGenerationLogEntry, AIGenerationMetrics } from '@/lib/audio/types';
+import { AIAudioStreamMetrics, SidecarStatus } from '@/lib/audio/types';
 
 interface AIGenerationMonitorProps {
-  metrics: AIGenerationMetrics | null;
-  logs: AIGenerationLogEntry[];
-  onClear: () => void;
+  sidecarStatus: SidecarStatus | null;
+  aiStreamMetrics: AIAudioStreamMetrics | null;
+  onResetReceiver?: () => void;
 }
 
 const ChevronIcon: React.FC<{ open: boolean }> = ({ open }) => (
@@ -27,28 +27,31 @@ const ChevronIcon: React.FC<{ open: boolean }> = ({ open }) => (
 );
 
 export const AIGenerationMonitor: React.FC<AIGenerationMonitorProps> = ({
-  metrics,
-  logs,
-  onClear,
+  sidecarStatus,
+  aiStreamMetrics,
+  onResetReceiver,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
-  const latestGen = logs.length > 0 ? logs[0].generationLatencyMs : null;
+  const sidecarState = sidecarStatus?.state || 'unavailable';
+  const rttMs = sidecarStatus?.roundTripMs ?? null;
 
-  const computeMedian = (entries: AIGenerationLogEntry[]): number | null => {
-    if (entries.length === 0) return null;
-    const sorted = [...entries].map((e) => e.generationLatencyMs).sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  const streamState = aiStreamMetrics?.state || 'idle';
+  const bufferDepthMs = aiStreamMetrics?.bufferDepthMs ?? 0;
+  const bufferDepthChunks = aiStreamMetrics?.bufferDepthChunks ?? 0;
+  const underrunCount = aiStreamMetrics?.underrunCount ?? 0;
+
+  const getStatusLedColor = () => {
+    if (sidecarState === 'connected' && streamState === 'streaming') return 'bg-emerald-400 led-emerald';
+    if (sidecarState === 'high-latency' || streamState === 'buffering') return 'bg-amber-400 led-ember';
+    if (streamState === 'stalled') return 'bg-rose-400 led-rose';
+    return 'bg-slate-500';
   };
-
-  const medianGen = computeMedian(logs);
-  const isFallback = logs.length > 0 ? logs[0].isFallback : false;
 
   return (
     <section
-      aria-label="Local AI Generation Telemetry & Latency Logs"
-      className="rack-module rounded-2xl overflow-hidden"
+      aria-label="MRT2 Real-Time Stream & Sidecar Telemetry Monitor"
+      className="rack-module rounded-2xl overflow-hidden border border-white/10 bg-[#171919]"
     >
       {/* Header Bar / Toggle */}
       <button
@@ -58,133 +61,98 @@ export const AIGenerationMonitor: React.FC<AIGenerationMonitorProps> = ({
       >
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400 led-ember animate-pulse" />
+            <span className={`h-2.5 w-2.5 rounded-full ${getStatusLedColor()} animate-pulse`} />
             <span className="text-sm font-semibold text-slate-200">
-              Local AI Generation Telemetry (TF.js WASM + Magenta.js)
+              Stage 2 MRT2 Audio Stream Monitor
             </span>
           </div>
 
           <div className="flex items-center gap-3 font-mono-tech text-xs">
-            {latestGen !== null ? (
-              <>
-                <span className="text-slate-400">
-                  Latest Bar Gen: <strong className="text-amber-400 font-bold">{latestGen} ms</strong>
-                </span>
-                <span className="text-slate-400">
-                  Median: <strong className="text-emerald-400 font-bold">{medianGen?.toFixed(0)} ms</strong>
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                    isFallback
-                      ? 'bg-amber-950/80 text-amber-300 border-amber-500/40'
-                      : 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40'
-                  }`}
-                >
-                  {isFallback ? '⚠️ FALLBACK REPEAT' : '✓ 1-BAR LOOKAHEAD READY'}
-                </span>
-              </>
-            ) : (
-              <span className="text-slate-500">Awaiting Bar Boundary Cycles…</span>
-            )}
+            <span className="text-slate-400">
+              Sidecar RTT: <strong className="text-amber-400 font-bold">{rttMs !== null ? `${rttMs} ms` : '--'}</strong>
+            </span>
+            <span className="text-slate-400">
+              Jitter Buffer: <strong className="text-cyan-400 font-bold">{bufferDepthMs} ms ({bufferDepthChunks} chunks)</strong>
+            </span>
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                streamState === 'streaming'
+                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40'
+                  : streamState === 'buffering'
+                  ? 'bg-amber-950/80 text-amber-300 border-amber-500/40'
+                  : 'bg-rose-950/80 text-rose-300 border-rose-500/40'
+              }`}
+            >
+              {streamState.toUpperCase()}
+            </span>
           </div>
         </div>
 
         <ChevronIcon open={expanded} />
       </button>
 
-      {/* Expanded Stats & Log Stream */}
+      {/* Expanded Telemetry Readout Cards */}
       {expanded && (
         <div className="border-t border-white/10 px-5 pb-5 pt-4 space-y-4">
-          {/* Readout Counter Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center font-mono-tech">
+            {/* 1. Sidecar RTT Latency */}
             <div className="bg-black/40 rounded-xl p-3 border border-white/5 flex flex-col items-center">
               <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
-                LATEST GEN ΔT
+                SIDECAR RTT LATENCY
               </span>
               <span className="text-xl font-bold text-amber-400 tabular-nums">
-                {latestGen !== null ? `${latestGen} ms` : '--'}
+                {rttMs !== null ? `${rttMs} ms` : 'N/A'}
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 uppercase">
+                {sidecarState}
               </span>
             </div>
 
+            {/* 2. Jitter Buffer Depth */}
             <div className="bg-black/40 rounded-xl p-3 border border-white/5 flex flex-col items-center">
               <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
-                MEDIAN GEN ΔT
+                JITTER BUFFER DEPTH
               </span>
-              <span className="text-xl font-bold text-emerald-400 tabular-nums">
-                {medianGen !== null ? `${medianGen.toFixed(1)} ms` : '--'}
+              <span className="text-xl font-bold text-cyan-300 tabular-nums">
+                {bufferDepthMs} ms
+              </span>
+              <span className="text-[10px] text-slate-400 mt-1">
+                {bufferDepthChunks} CHUNKS (40MS EA)
               </span>
             </div>
 
+            {/* 3. Total Underruns / Dropped Chunks */}
             <div className="bg-black/40 rounded-xl p-3 border border-white/5 flex flex-col items-center">
               <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
-                LOOKAHEAD CADENCE
+                UNDERRUNS / DROPS
               </span>
-              <span className="text-sm font-bold text-cyan-300 mt-1 uppercase">
-                1 BAR (2.0 SEC)
+              <span
+                className={`text-xl font-bold tabular-nums ${
+                  underrunCount > 0 ? 'text-rose-400' : 'text-emerald-400'
+                }`}
+              >
+                {underrunCount}
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 uppercase">
+                {underrunCount === 0 ? 'GAPLESS PLAYBACK' : 'DROPPED FRAMES'}
               </span>
             </div>
 
-            <div className="bg-black/40 rounded-xl p-3 border border-white/5 flex flex-col items-center">
+            {/* 4. Stream State */}
+            <div className="bg-black/40 rounded-xl p-3 border border-white/5 flex flex-col items-center justify-between">
               <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
-                INFERENCE BACKEND
+                STREAM STATUS
               </span>
-              <span className="text-sm font-bold text-slate-200 mt-1 uppercase">
-                TF.JS WASM WORKER
+              <span className="text-sm font-bold text-slate-200 uppercase">
+                {streamState}
               </span>
-            </div>
-          </div>
-
-          {/* Per-Bar Generation Log Stream */}
-          <div>
-            <div className="flex items-center justify-between mb-2 font-mono-tech text-xs">
-              <span className="text-slate-400 uppercase tracking-wider">
-                PER-BAR GENERATION CYCLE LOG (LAST 10 BARS)
-              </span>
-              {logs.length > 0 && (
+              {onResetReceiver && (
                 <button
-                  onClick={onClear}
-                  aria-label="Clear generation logs"
-                  className="text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                  onClick={onResetReceiver}
+                  className="mt-1 text-[10px] text-slate-400 hover:text-rose-400 transition cursor-pointer"
                 >
-                  [CLEAR LOGS]
+                  [RESET STREAM]
                 </button>
-              )}
-            </div>
-
-            <div className="rack-bezel max-h-40 overflow-y-auto rounded-xl p-2 font-mono-tech text-xs">
-              {logs.length === 0 ? (
-                <p className="text-slate-500 text-center py-6 italic font-sans text-xs">
-                  No AI generation cycles logged yet. Start playing in AI Generation Mode to trigger per-bar lookahead inference.
-                </p>
-              ) : (
-                <table className="w-full text-left tabular-nums">
-                  <thead>
-                    <tr className="border-b border-white/10 text-slate-400 text-[10px] uppercase">
-                      <th className="py-1.5 px-3">BAR INDEX</th>
-                      <th className="py-1.5 px-3">TIMESTAMP</th>
-                      <th className="py-1.5 px-3">NOTES (DRUMS / MELODY)</th>
-                      <th className="py-1.5 px-3 text-right">GEN LATENCY ΔT</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {logs.map((log) => (
-                      <tr key={log.id} className="hover:bg-white/5 transition">
-                        <td className="py-1.5 px-3 text-cyan-300 font-bold">
-                          BAR #{log.barIndex}
-                        </td>
-                        <td className="py-1.5 px-3 text-slate-400">
-                          {new Date(log.timestamp).toLocaleTimeString()}
-                        </td>
-                        <td className="py-1.5 px-3 text-slate-300">
-                          🥁 {log.drumNotesCount} drums • 🎹 {log.melodyNotesCount} bass notes
-                        </td>
-                        <td className="py-1.5 px-3 text-right font-bold text-amber-400">
-                          {log.generationLatencyMs} ms
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               )}
             </div>
           </div>
