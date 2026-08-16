@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { AudioEngine } from '@/lib/audio/AudioEngine';
 import {
   AIAudioStreamMetrics,
@@ -21,15 +20,6 @@ import { ImmersiveWelcomeHomeScreen } from '@/components/screens/ImmersiveWelcom
 import { StudioHubRefinedScreen } from '@/components/screens/StudioHubRefinedScreen';
 import { MultiLaneMIDIStudioScreen } from '@/components/screens/MultiLaneMIDIStudioScreen';
 import { RefinedCalibrationModal } from '@/components/RefinedCalibrationModal';
-
-import { Visualizer } from '@/components/Visualizer';
-import { ControlPanel } from '@/components/ControlPanel';
-import { TierGauge } from '@/components/TierGauge';
-import { StatusBanner } from '@/components/StatusBanner';
-import { ModeToggle } from '@/components/ModeToggle';
-import { LatencyMonitor } from '@/components/LatencyMonitor';
-import { AIGenerationMonitor } from '@/components/AIGenerationMonitor';
-import { DesktopDownloadBanner } from '@/components/DesktopDownloadBanner';
 import { StudioSettingsModal } from '@/components/StudioSettingsModal';
 import { ConditioningBridge } from '@/lib/audio/ConditioningBridge';
 
@@ -145,9 +135,6 @@ export default function StudioHomePage() {
     }
   };
 
-
-  const activeTier: PerformanceTier =
-    operatingMode === 'OVERRIDE' ? overrideTier : metrics?.activeTier || 'chill';
 
   return (
     <div className="relative min-h-screen bg-[#121414] text-[#e3e2e2]">

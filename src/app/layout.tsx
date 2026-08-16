@@ -18,8 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 const ebGaramond = EB_Garamond({
   variable: "--font-eb-garamond",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
+  weight: ["400", "700"],
 });
 
 const hankenGrotesk = Hanken_Grotesk({

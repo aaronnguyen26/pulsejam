@@ -10,8 +10,27 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# testing & verification modules
 /coverage
+test-outputs/
+test-assets/
+archive/
+experiments/
+unused/
+out 2/
+*.spec
+scripts/verify-*.js
+scripts/test-*
+scripts/audio_conditioning_test.py
+scripts/generate-test-audio.js
+src/app/studio/dev/
+
+# python caches & compiled bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.agents/**/__pycache__/
+scripts/**/__pycache__/
 
 # next.js
 /.next/
@@ -23,6 +42,9 @@
 # misc
 .DS_Store
 *.pem
+*.key
+*.p12
+*.pfx
 
 # debug
 npm-debug.log*
@@ -47,7 +69,6 @@ build/
 *.dmg
 *.app
 
-# experiments
-experiments/
-
-
+# local security & audit documentation (do not push to github)
+SECURITY_AND_REPO_AUDIT.md
+TESTING_RESULT.md

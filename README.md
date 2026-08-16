@@ -8,43 +8,8 @@ It unifies real-time WebAudio DSP, single-stream MRT2 continuous audio generatio
 
 ## 🏗️ System Architecture Diagram
 
-```
-                                  +---------------------------------------+
-                                  |    Live Instrument / Microphone       |
-                                  +---------------------------------------+
-                                                      |
-                                                      v
-                                  +---------------------------------------+
-                                  |      WebAudio API Input Pipeline      |
-                                  |  MediaStreamSource -> GainNode        |
-                                  |  -> BiquadFilter (80Hz Highpass)      |
-                                  +---------------------------------------+
-                                                      |
-                                                      v
-                                  +---------------------------------------+
-                                  |        Stage 1: Client DSP            |
-                                  |  AudioWorklet (dsp-processor.js)      |
-                                  |  - YIN Pitch Tracker (C2-C6)          |
-                                  |  - EMA RMS dB & Onset Density         |
-                                  |  - State Machine (Chill/Groove/Peak)  |
-                                  +---------------------------------------+
-                                                      |
-                                                      v
-                         +-------------------------------------------------+
-                         |     Stage 2: Single-Stream MRT2 AI Receiver     |
-                         |       AIAudioReceiver (src/lib/audio/...)       |
-                         |   - 40ms PCM Chunks (float32, 48kHz, stereo)    |
-                         |   - 120ms Jitter Buffer (3 Chunks Target)       |
-                         |   - Sequence Gap & Underrun Detection           |
-                         |   - Worklet (ai-receiver-processor.js)          |
-                         |   - Mixer Stage (Independent Gain Controls)     |
-                         +-------------------------------------------------+
-                                              |
-                                              v
-                       +---------------------------------------------------------+
-                       |         WebAudio Master Destination (Speakers)          |
-                       +---------------------------------------------------------+
-```
+![PulseJam AI Real-Time System Architecture](public/images/pulsejam_architecture_diagram.jpg)
+
 
 ### Data Flow Diagram (Mermaid)
 
@@ -214,7 +179,7 @@ Do not attempt a fresh PyInstaller bundling from scratch without addressing both
 
 ### 3. Original Stage 3 (Cloud Vibe Layer) — Archived
 
-The original Stage 3 (Google Lyria RealTime cloud ambient layer) was archived on 2026-08-10 after MRT2's local generation quality was validated by ear and confirmed sufficient, superseding the original rationale for a cloud hybrid supplement. Its removal from the active roadmap caused desktop packaging to be renumbered from Stage 4 → Stage 3 (see section below). The full implementation is preserved at [`archive/stage3-lyria/`](archive/stage3-lyria/) with a restore guide.
+The original Stage 3 (Google Lyria RealTime cloud ambient layer) was archived on 2026-08-10 after MRT2's local generation quality was validated by ear and confirmed sufficient, superseding the original rationale for a cloud hybrid supplement. Its removal from the active roadmap caused desktop packaging to be renumbered from Stage 4 → Stage 3 (see section below). The full implementation is preserved in the project archive (`unused/archive/stage3-lyria/`) with a restore guide.
 
 ---
 

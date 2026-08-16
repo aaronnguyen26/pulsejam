@@ -30,6 +30,6 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "out", "out 2", "experiments", "archive"]
+  "exclude": ["node_modules", "out", "unused", "experiments", "archive", "src-tauri"]
 }
 
