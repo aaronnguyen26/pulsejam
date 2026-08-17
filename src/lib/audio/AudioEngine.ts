@@ -18,11 +18,16 @@ import { AIAudioReceiver } from './AIAudioReceiver';
 import { useAudioSettingsStore } from '../state/audioSettingsStore';
 import { useCalibrationStore } from '../state/calibrationStore';
 import { ConditioningBridge } from './ConditioningBridge';
+import { MasteringChain, MasteringOptions } from './MasteringChain';
+import { ChordProgressionTracker, ChordEstimate } from './ChordProgressionTracker';
+import { DynamicArranger, ArrangerState } from './DynamicArranger';
 
 type MetricsCallback = (metrics: DSPMetrics) => void;
 type LatencyCallback = (entry: LatencyLogEntry) => void;
 type StatusCallback = (status: AudioEngineStatus) => void;
 type AIAudioMetricsCallback = (metrics: AIAudioStreamMetrics) => void;
+type _ChordCallback = (chord: ChordEstimate) => void;
+type _ArrangerCallback = (state: ArrangerState) => void;
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -42,6 +47,11 @@ export class AudioEngine {
   private micCompressorNode: DynamicsCompressorNode | null = null;
   private aiGainNode: GainNode | null = null;
   private masterGainNode: GainNode | null = null;
+
+  // Phase 4: Mastering Chain & Harmonic Intelligence Engines
+  private masteringChain: MasteringChain | null = null;
+  private chordTracker: ChordProgressionTracker;
+  private dynamicArranger: DynamicArranger;
 
   private conditioningBridge: ConditioningBridge | null = null;
   private pendingSnapshotResolver: ((samples: Float32Array) => void) | null = null;
@@ -64,6 +74,8 @@ export class AudioEngine {
   private latencyHistory: LatencyLogEntry[] = [];
 
   constructor() {
+    this.chordTracker = new ChordProgressionTracker();
+    this.dynamicArranger = new DynamicArranger();
     this.aiAudioReceiver = new AIAudioReceiver();
     this.aiAudioReceiver.subscribeMetrics((metrics) => {
       this.aiAudioMetricsListeners.forEach((cb) => cb(metrics));
@@ -95,7 +107,7 @@ export class AudioEngine {
       this.stemEngine = new StemEngine(this.ctx);
       await this.loadStems(stemSource);
 
-      // 2. Setup Stage 2 Mixer Stage (Master, Mic Mix Gain, AI Mix Gain, DynamicsCompressor Safety Limiter)
+      // 2. Setup Stage 2 Mixer Stage & Phase 4 Mastering Chain
       this.masterGainNode = this.ctx.createGain();
       this.micGainNode = this.ctx.createGain();
       this.micCompressorNode = this.ctx.createDynamicsCompressor();
@@ -107,6 +119,8 @@ export class AudioEngine {
       this.micGainNode.gain.setValueAtTime(0.0, this.ctx.currentTime);
       this.aiGainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
 
+      // Phase 4: Instantiate 3-Band Neural Mastering Chain
+      this.masteringChain = new MasteringChain(this.ctx);
 
       // DynamicsCompressor safety ceiling limiter tuned near 0dBFS (-2.0dB threshold, 2.0dB knee, 20:1 ratio)
       this.micCompressorNode.threshold.setValueAtTime(-2.0, this.ctx.currentTime);
@@ -115,11 +129,12 @@ export class AudioEngine {
       this.micCompressorNode.attack.setValueAtTime(0.003, this.ctx.currentTime);
       this.micCompressorNode.release.setValueAtTime(0.1, this.ctx.currentTime);
 
-
-
       this.micGainNode.connect(this.micCompressorNode);
       this.micCompressorNode.connect(this.masterGainNode);
-      this.aiGainNode.connect(this.masterGainNode);
+
+      // Route AI Output -> 3-Band Mastering Processor -> Master Gain
+      this.aiGainNode.connect(this.masteringChain.getInputNode());
+      this.masteringChain.getOutputNode().connect(this.masterGainNode);
       this.masterGainNode.connect(this.ctx.destination);
 
       // Initialize Stage 2 AIAudioReceiver WebAudio AudioWorklet
@@ -550,6 +565,47 @@ export class AudioEngine {
 
   public getAudioContext(): AudioContext | null {
     return this.ctx;
+  }
+
+  public getMasteringChain(): MasteringChain | null {
+    return this.masteringChain;
+  }
+
+  public getChordTracker(): ChordProgressionTracker {
+    return this.chordTracker;
+  }
+
+  public getDynamicArranger(): DynamicArranger {
+    return this.dynamicArranger;
+  }
+
+  public setMasteringOptions(options: MasteringOptions): void {
+    if (!this.masteringChain) return;
+    if (typeof options.enableWarmth === 'boolean') {
+      if (!options.enableWarmth) this.masteringChain.setWarmth(0.0);
+    }
+    if (typeof options.warmthAmount === 'number') {
+      this.masteringChain.setWarmth(options.warmthAmount);
+    }
+    if (typeof options.stereoWidth === 'number') {
+      this.masteringChain.setStereoWidth(options.stereoWidth);
+    }
+    if (typeof options.reverbWet === 'number') {
+      this.masteringChain.setReverbWet(options.reverbWet);
+    }
+    if (options.reverbSpace) {
+      this.masteringChain.setReverbSpace(options.reverbSpace);
+    }
+    if (typeof options.limiterCeilingDb === 'number') {
+      this.masteringChain.setLimiterCeiling(options.limiterCeilingDb);
+    }
+  }
+
+  public setMasterVolume(vol: number): void {
+    if (this.masterGainNode && this.ctx) {
+      const v = Math.max(0, Math.min(2.0, vol));
+      this.masterGainNode.gain.setValueAtTime(v, this.ctx.currentTime);
+    }
   }
 
   public destroy() {

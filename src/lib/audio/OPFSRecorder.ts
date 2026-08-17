@@ -1,9 +1,10 @@
 /**
- * PulseJam Stage 3 — OPFSRecorder & Jam Take Manager
+ * PulseJam Stage 3/4 — OPFSRecorder & Jam Take Manager with Retrospective Capture
  *
- * Provides crash-resilient multi-take audio recording.
- * Buffers 48kHz stereo PCM chunks in memory and streams to disk / Origin Private File System (OPFS).
- * Manages discrete session takes (Take 1, Take 2, Take 3) with metadata and duration tracking.
+ * Provides crash-resilient multi-take audio recording and retroactive loop capture ("Keep Last 8 Bars"):
+ * 1. Buffers 48kHz stereo PCM chunks in memory and streams to disk / Origin Private File System (OPFS).
+ * 2. Continuous 60-second circular rolling buffer enabling instant "Keep That Riff" capture without prior recording.
+ * 3. Manages discrete session takes (Take 1, Take 2, Take 3) with metadata and duration tracking.
  */
 
 import { JamTakeMetadata } from './types';
@@ -27,6 +28,10 @@ export class OPFSRecorder {
   private currentChunks: RecordedChunk[] = [];
   private completedTakes: TakeData[] = [];
   private maxChunksPerTake: number = 50000; // ~33 minutes of 40ms frames per take in RAM
+
+  // Retrospective 60-Second Circular Rolling Buffer
+  private rollingBuffer: RecordedChunk[] = [];
+  private maxRollingChunks: number = 1500; // 60s at 40ms chunks
 
   constructor(sampleRate: number = 48000) {
     this.sampleRate = sampleRate;
@@ -77,9 +82,10 @@ export class OPFSRecorder {
     };
   }
 
+  /**
+   * Pushes audio into active take (if recording) AND into retrospective circular rolling buffer
+   */
   public pushAudioChunk(left: Float32Array, right?: Float32Array): void {
-    if (!this.isRecording) return;
-
     const r = right || left;
     // Copy into discrete float buffers
     const lCopy = new Float32Array(left.length);
@@ -87,13 +93,68 @@ export class OPFSRecorder {
     lCopy.set(left);
     rCopy.set(r);
 
-    if (this.currentChunks.length < this.maxChunksPerTake) {
-      this.currentChunks.push({
-        left: lCopy,
-        right: rCopy,
-        timestamp: Date.now(),
-      });
+    const chunk: RecordedChunk = {
+      left: lCopy,
+      right: rCopy,
+      timestamp: Date.now(),
+    };
+
+    // 1. Maintain retrospective 60s circular buffer
+    this.rollingBuffer.push(chunk);
+    if (this.rollingBuffer.length > this.maxRollingChunks) {
+      this.rollingBuffer.shift();
     }
+
+    // 2. Push to active take if recording
+    if (this.isRecording && this.currentChunks.length < this.maxChunksPerTake) {
+      this.currentChunks.push(chunk);
+    }
+  }
+
+  /**
+   * Retrospective Loop Capture ("Keep Last 8 Bars"):
+   * Slices the last N bars of audio from the rolling buffer and saves it as an immediate completed take!
+   * @param bars Number of bars to keep (default 8)
+   * @param bpm Current tempo BPM (default 120)
+   */
+  public captureRetrospectiveTake(bars: number = 8, bpm: number = 120): JamTakeMetadata | null {
+    if (this.rollingBuffer.length === 0) return null;
+
+    // Calculate required duration: bars * (4 beats / bar) * (60 / bpm) seconds
+    const targetSeconds = (bars * 4 * 60) / Math.max(40, bpm);
+    const targetSamples = Math.floor(targetSeconds * this.sampleRate);
+
+    let collectedSamples = 0;
+    const slicedChunks: RecordedChunk[] = [];
+
+    // Walk backwards through rolling buffer
+    for (let i = this.rollingBuffer.length - 1; i >= 0; i--) {
+      const c = this.rollingBuffer[i];
+      slicedChunks.unshift(c);
+      collectedSamples += c.left.length;
+      if (collectedSamples >= targetSamples) break;
+    }
+
+    if (slicedChunks.length === 0) return null;
+
+    this.currentTakeNumber++;
+    const durationMs = Math.round(targetSeconds * 1000);
+    const metadata: JamTakeMetadata = {
+      takeId: `take-${this.currentTakeNumber}-retro`,
+      takeNumber: this.currentTakeNumber,
+      startTime: Date.now() - durationMs,
+      durationMs,
+      sampleRate: this.sampleRate,
+      channelCount: 2,
+      fileSizeEstimate: this.calculateTakeSizeEstimate(slicedChunks),
+    };
+
+    this.completedTakes.push({
+      metadata,
+      chunks: slicedChunks,
+    });
+
+    return metadata;
   }
 
   public stopTake(): JamTakeMetadata | null {
@@ -105,7 +166,7 @@ export class OPFSRecorder {
       takeId: `take-${this.currentTakeNumber}`,
       takeNumber: this.currentTakeNumber,
       startTime: this.currentTakeStartTime,
-      durationMs: Math.max( durationMs, 100),
+      durationMs: Math.max(durationMs, 100),
       sampleRate: this.sampleRate,
       channelCount: 2,
       fileSizeEstimate: this.calculateTakeSizeEstimate(this.currentChunks),
@@ -150,6 +211,7 @@ export class OPFSRecorder {
     this.currentChunks = [];
     this.isRecording = false;
     this.currentTakeNumber = 0;
+    this.rollingBuffer = [];
   }
 
   private calculateTakeSizeEstimate(chunks: RecordedChunk[]): number {

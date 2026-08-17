@@ -118,11 +118,13 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
       {/* ── Top Navigation Bar (h-16 on mobile, h-24 on desktop) ──────── */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#131313]/80 backdrop-blur-2xl border-b border-[#e7c9a6]/10 transition-all duration-300">
         <div className="flex justify-between items-center h-16 md:h-24 px-4 md:px-12 max-w-[1280px] mx-auto">
-          <a href="#" className="font-headline-sm text-xl md:text-2xl text-[#f2ca50] tracking-tight flex items-center gap-2 group font-bold">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:rotate-90 transition-transform duration-500">
-              <path d="M12 2v20M17 5v14M7 8v8M2 11v2M22 11v2" />
-            </svg>
-            PulseJam AI
+          <a href="#" className="font-headline-sm text-xl md:text-2xl text-[#f2ca50] tracking-tight flex items-center gap-3 group font-bold">
+            <img
+              src="/pulsejam_app_logo.jpg"
+              alt="PulseJam AI Logo"
+              className="w-8 h-8 rounded-lg border border-[#f2ca50]/40 shadow-[0_0_12px_rgba(242,202,80,0.3)] object-cover group-hover:scale-105 transition-transform"
+            />
+            <span>PulseJam AI</span>
           </a>
 
           <div className="hidden md:flex gap-10 items-center text-sm font-body-md text-[#d0c5af]">
@@ -147,12 +149,23 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                 strokeWidth="2"
                 className={`transition-transform duration-300 ${downloadOpen ? 'rotate-180' : ''}`}
               >
-                <path d="M6 9l6 6 6-6" />
+                <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
 
             {downloadOpen && (
-              <div className="absolute right-0 mt-4 w-60 md:w-64 glass-panel border border-hairline rounded-xl shadow-2xl overflow-hidden highlight-top p-2 space-y-1 z-50 animate-fade-in">
+              <div className="absolute right-0 top-full mt-3 w-80 bg-[#1f2020] border border-[#f2ca50]/30 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#4d4635]/40">
+                  <img
+                    src="/pulsejam_app_logo.jpg"
+                    alt="PulseJam App"
+                    className="w-12 h-12 rounded-xl border border-[#f2ca50]/50 shadow-[0_0_12px_rgba(242,202,80,0.3)] object-cover shrink-0"
+                  />
+                  <div>
+                    <h4 className="text-xs font-bold text-[#f2ca50] font-mono">PulseJam AI Studio Pro</h4>
+                    <p className="text-[10px] text-[#d0c5af]/70 font-mono">macOS Apple Silicon (.dmg)</p>
+                  </div>
+                </div>
                 <a
                   href="/downloads/PulseJam_0.1.0_aarch64.dmg"
                   download="PulseJam_0.1.0_aarch64.dmg"

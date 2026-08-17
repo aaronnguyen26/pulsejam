@@ -155,3 +155,61 @@ export interface JamTakeMetadata {
   fileSizeEstimate: number;
 }
 
+// ─── Phase 4: Mastering & Harmonic Intelligence Types ───────────────────────
+export interface MasteringOptions {
+  enableWarmth?: boolean;
+  warmthAmount?: number; // 0.0 - 1.0 (tube drive)
+  enableLimiter?: boolean;
+  limiterCeilingDb?: number; // default -0.1 dB
+  enableStereoWidener?: boolean;
+  stereoWidth?: number; // 0.0 (mono) - 2.0 (super-wide)
+  enableReverb?: boolean;
+  reverbWet?: number; // 0.0 - 1.0
+  reverbSpace?: 'studio' | 'plate' | 'ambient';
+}
+
+export type ChordQuality =
+  | 'Major'
+  | 'Minor'
+  | '7th'
+  | 'Maj7'
+  | 'Min7'
+  | 'Dim'
+  | 'Sus4'
+  | 'Unknown';
+
+export interface ChordEstimate {
+  rootNoteName: string;
+  rootMidiPitch: number;
+  quality: ChordQuality;
+  chordSymbol: string;
+  confidence: number;
+  romanNumeral: string;
+  recommendedScales: string[];
+  harmonicTension: number;
+}
+
+export type SongSection =
+  | 'intro'
+  | 'verse'
+  | 'preChorus'
+  | 'chorus'
+  | 'solo'
+  | 'breakdown'
+  | 'outro';
+
+export type RhythmicFeel = 'standard' | 'halfTime' | 'doubleTime';
+
+export interface ArrangerState {
+  currentSection: SongSection;
+  currentBar: number;
+  currentBeat: number;
+  totalBarsPlayed: number;
+  feel: RhythmicFeel;
+  isFillQueued: boolean;
+  isFillActive: boolean;
+  energyLevel: number;
+  sectionProgress: number;
+}
+
+
