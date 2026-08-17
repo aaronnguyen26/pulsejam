@@ -1,0 +1,5 @@
+websockets>=12.0
+numpy>=1.24.0
+# For Apple Silicon MLX GPU acceleration:
+# mlx>=0.10.0
+# magenta-rt>=0.1.0

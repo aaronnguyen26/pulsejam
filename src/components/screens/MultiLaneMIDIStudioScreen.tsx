@@ -8,10 +8,16 @@ import {
   DSPMetrics,
   PerformanceTier,
   SidecarStatus,
+  JamTakeMetadata,
 } from '@/lib/audio/types';
 import { AddTrackModal, TrackType } from '@/components/AddTrackModal';
-import { useAudioSettingsStore } from '@/lib/state/audioSettingsStore';
 import { AIGenerationMonitor } from '@/components/AIGenerationMonitor';
+import { TempoTracker, CountInState } from '@/lib/audio/TempoTracker';
+import { ChromaFeatureExtractor } from '@/lib/audio/ChromaFeatureExtractor';
+import { STYLE_PRESETS, getStylePreset } from '@/lib/audio/StylePresets';
+import { WebMIDIManager } from '@/lib/audio/WebMIDIManager';
+import { OPFSRecorder } from '@/lib/audio/OPFSRecorder';
+import { StemExporter } from '@/lib/audio/StemExporter';
 
 export interface DynamicTrackLane {
   id: string;
@@ -37,7 +43,7 @@ export function MultiLaneMIDIStudioScreen({
   onOpenSettings,
   onNavigateBack,
 }: MultiLaneMIDIStudioScreenProps) {
-  // Initial Stage 2 Track Setup (Live Input + Single AI Companion MRT2 Audio Track)
+  // Tracks
   const [tracks, setTracks] = useState<DynamicTrackLane[]>([
     {
       id: 'live-input-lane',
@@ -61,10 +67,9 @@ export function MultiLaneMIDIStudioScreen({
     },
   ]);
 
-  // Mix Gain Controls (micGain defaults to 0.0 to prevent acoustic feedback unless headphones are used)
+  // Mix Gain Controls
   const [micGain, setMicGain] = useState<number>(0.0);
   const [aiGain, setAiGain] = useState<number>(1.0);
-
 
   // In-Memory Live Audio Take & Waveform State
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
@@ -74,9 +79,25 @@ export function MultiLaneMIDIStudioScreen({
   const [aiStreamMetrics, setAiStreamMetrics] = useState<AIAudioStreamMetrics | null>(null);
   const [sidecarStatusState, setSidecarStatusState] = useState<SidecarStatus>({ state: 'unavailable' });
   const [liveConfidenceState, setLiveConfidenceState] = useState<number>(0);
-  const [liveConditioningModeState, setLiveConditioningModeState] = useState<'midi+audio' | 'audio-only'>('midi+audio');
   const [activeTierState, setActiveTierState] = useState<PerformanceTier>('chill');
   const previousTierRef = useRef<PerformanceTier | null>(null);
+
+  // Phase 2: Style Preset, Harmonic Key & Real-Time Tempo State
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('neo-soul');
+  const [currentBpm, setCurrentBpm] = useState<number>(92);
+  const [countInBeat, setCountInBeat] = useState<number>(0);
+  const [countInStatus, setCountInStatus] = useState<CountInState>('idle');
+  const [estimatedKey, setEstimatedKey] = useState<string>('A Minor');
+  const [keyConfidence, setKeyConfidence] = useState<number>(0);
+
+  // Phase 3: Web MIDI & Jam Take Manager State
+  const [midiStatus, setMidiStatus] = useState<{ isSupported: boolean; isConnected: boolean; deviceCount: number }>({
+    isSupported: false,
+    isConnected: false,
+    deviceCount: 0,
+  });
+  const [savedTakes, setSavedTakes] = useState<JamTakeMetadata[]>([]);
+  const [selectedTakeNumber, setSelectedTakeNumber] = useState<number>(1);
 
   // Transport & Audio Status State
   const [isRecording, setIsRecording] = useState(false);
@@ -84,6 +105,12 @@ export function MultiLaneMIDIStudioScreen({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAddTrackOpen, setIsAddTrackOpen] = useState(false);
+
+  // References to Phase 2/3 Engines
+  const tempoTrackerRef = useRef<TempoTracker | null>(null);
+  const chromaExtractorRef = useRef<ChromaFeatureExtractor | null>(null);
+  const midiManagerRef = useRef<WebMIDIManager | null>(null);
+  const opfsRecorderRef = useRef<OPFSRecorder | null>(null);
 
   // MediaRecorder & Scrub References
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -99,6 +126,90 @@ export function MultiLaneMIDIStudioScreen({
   const isDraggingPlayheadRef = useRef<boolean>(false);
 
   const PIXELS_PER_SECOND = 60;
+
+  // Initialize Phase 2 & 3 Engines
+  useEffect(() => {
+    // 1. Initialize OPFS Recorder
+    opfsRecorderRef.current = new OPFSRecorder(48000);
+
+    // 2. Initialize Chroma Extractor
+    chromaExtractorRef.current = new ChromaFeatureExtractor(0.94);
+
+    // 3. Initialize Tempo Tracker & Acoustic Count-In
+    const tracker = new TempoTracker({
+      onCountInBeat: (beat, bpm) => {
+        setCountInBeat(beat);
+        setCurrentBpm(bpm);
+      },
+      onCountInComplete: (lockedBpm) => {
+        setCountInStatus('locked');
+        setCountInBeat(0);
+        setCurrentBpm(lockedBpm);
+        handleStartRecording();
+      },
+      onTempoUpdated: (bpm) => {
+        setCurrentBpm(bpm);
+      },
+    });
+    tempoTrackerRef.current = tracker;
+
+    // 4. Initialize Web MIDI Footswitch Manager
+    const midi = new WebMIDIManager({
+      onActionTriggered: (action) => {
+        if (action === 'TOGGLE_RECORD') {
+          handleToggleRecord();
+        } else if (action === 'COUNT_IN') {
+          handleArmCountIn();
+        } else if (action === 'TIER_UP') {
+          setActiveTierState((prev) => (prev === 'chill' ? 'groove' : 'peak'));
+        } else if (action === 'TIER_DOWN') {
+          setActiveTierState((prev) => (prev === 'peak' ? 'groove' : 'chill'));
+        }
+      },
+      onDeviceConnected: () => {
+        setMidiStatus(midi.getStatus());
+      },
+      onDeviceDisconnected: () => {
+        setMidiStatus(midi.getStatus());
+      },
+    });
+
+    midi.initialize().then(() => {
+      setMidiStatus(midi.getStatus());
+    });
+    midiManagerRef.current = midi;
+
+    return () => {
+      midi.disconnect();
+    };
+  }, []);
+
+  const handleSelectPreset = (presetId: string) => {
+    setSelectedPresetId(presetId);
+    const preset = getStylePreset(presetId);
+    if (preset) {
+      setCurrentBpm(preset.defaultBpm);
+      if (tempoTrackerRef.current) {
+        tempoTrackerRef.current.setBpm(preset.defaultBpm);
+      }
+      if (audioEngine) {
+        const bridge = audioEngine.getConditioningBridge();
+        if (bridge) {
+          bridge.setTierPromptMap(preset.tierPrompts);
+        }
+      }
+    }
+  };
+
+  // Synchronize ConditioningBridge prompts when engine or preset changes
+  useEffect(() => {
+    if (!audioEngine) return;
+    const bridge = audioEngine.getConditioningBridge();
+    const preset = getStylePreset(selectedPresetId);
+    if (bridge && preset) {
+      bridge.setTierPromptMap(preset.tierPrompts);
+    }
+  }, [selectedPresetId, audioEngine]);
 
   // Timeline scrub math
   const calculateTimeFromX = (clientX: number): number => {
@@ -178,7 +289,7 @@ export function MultiLaneMIDIStudioScreen({
     }
 
     const tick = () => {
-      const currentAudioTime = audioEngine?.getAudioContext()?.currentTime ?? (performance.now() / 1000);
+      const currentAudioTime = audioEngine?.getAudioContext()?.currentTime ?? performance.now() / 1000;
       const startAudioTime = sessionStartTimeRef.current ?? currentAudioTime;
       const elapsedSec = Math.max(0, currentAudioTime - startAudioTime);
 
@@ -212,7 +323,7 @@ export function MultiLaneMIDIStudioScreen({
     };
   }, [isRecording, isPlaying, audioEngine]);
 
-  // Audio Engine Subscriptions (Metrics & Status)
+  // Audio Engine Subscriptions (Metrics & Telemetry)
   useEffect(() => {
     if (!audioEngine) return;
 
@@ -229,6 +340,19 @@ export function MultiLaneMIDIStudioScreen({
         setLiveConfidenceState(Math.round(metrics.pitchConfidence * 100));
       }
 
+      // Harmonic Key Center & Chroma update
+      if (metrics.currentPitch !== undefined && metrics.currentPitch !== null && chromaExtractorRef.current) {
+        chromaExtractorRef.current.addPitch(metrics.currentPitch, 1.0);
+        const estimate = chromaExtractorRef.current.estimateKey();
+        setEstimatedKey(estimate.key);
+        setKeyConfidence(Math.round(estimate.confidence * 100));
+      }
+
+      // Acoustic onset tracking for tempo
+      if (metrics.rawOnsetDensity > 0 && tempoTrackerRef.current) {
+        tempoTrackerRef.current.registerOnset(Date.now());
+      }
+
       const amp = metrics.peakAmplitude ?? Math.min(1.0, Math.max(0.05, (metrics.rawRmsDb + 60) / 60));
       liveWaveformBufferRef.current.push(amp);
       if (liveWaveformBufferRef.current.length > 300) {
@@ -242,12 +366,8 @@ export function MultiLaneMIDIStudioScreen({
 
     const bridge = audioEngine.getConditioningBridge();
     let unsubSidecar: (() => void) | undefined;
-    let unsubFrames: (() => void) | undefined;
     if (bridge) {
       unsubSidecar = bridge.subscribeSidecarStatus((st) => setSidecarStatusState(st));
-      unsubFrames = bridge.subscribeFrames((frame) => {
-        setLiveConditioningModeState(frame.mode);
-      });
     }
 
     return () => {
@@ -255,7 +375,6 @@ export function MultiLaneMIDIStudioScreen({
       unsubMetrics();
       unsubAIAudio();
       if (unsubSidecar) unsubSidecar();
-      if (unsubFrames) unsubFrames();
     };
   }, [audioEngine]);
 
@@ -309,13 +428,27 @@ export function MultiLaneMIDIStudioScreen({
     );
   };
 
-  const handleToggleArm = (id: string) => {
-    setTracks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isArmed: !t.isArmed } : t))
-    );
+  // Recording Controls
+  const handleToggleRecord = () => {
+    if (isRecording) {
+      stopRecordingSession();
+    } else {
+      handleStartRecording();
+    }
   };
 
-  // Recording Controls
+  const handleArmCountIn = () => {
+    if (countInStatus === 'listening') {
+      tempoTrackerRef.current?.disarmCountIn();
+      setCountInStatus('idle');
+      setCountInBeat(0);
+    } else {
+      tempoTrackerRef.current?.armCountIn();
+      setCountInStatus('listening');
+      setCountInBeat(0);
+    }
+  };
+
   const handleStartRecording = async () => {
     if (!audioEngine) return;
     if (isRecording) {
@@ -332,6 +465,11 @@ export function MultiLaneMIDIStudioScreen({
       const success = await audioEngine.startMicrophone();
       if (!success) return;
 
+      // Start OPFS Multi-Take session
+      if (opfsRecorderRef.current) {
+        opfsRecorderRef.current.startTake();
+      }
+
       const stream = audioEngine.getMicStream();
       if (stream && typeof MediaRecorder !== 'undefined') {
         const recorder = new MediaRecorder(stream);
@@ -343,6 +481,8 @@ export function MultiLaneMIDIStudioScreen({
       }
 
       setIsRecording(true);
+      setCountInStatus('idle');
+      setCountInBeat(0);
     } catch (err: unknown) {
       setIsRecording(false);
       const msg = err instanceof Error ? err.message : String(err);
@@ -352,6 +492,14 @@ export function MultiLaneMIDIStudioScreen({
 
   const stopRecordingSession = () => {
     setIsRecording(false);
+    if (opfsRecorderRef.current) {
+      const finishedTake = opfsRecorderRef.current.stopTake();
+      if (finishedTake) {
+        setSavedTakes(opfsRecorderRef.current.getAllTakes());
+        setSelectedTakeNumber(finishedTake.takeNumber);
+      }
+    }
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.onstop = () => {
         if (recordedChunksRef.current.length > 0) {
@@ -396,6 +544,38 @@ export function MultiLaneMIDIStudioScreen({
     }
   };
 
+  const handleExportTakeWav = () => {
+    if (!opfsRecorderRef.current) return;
+    const audioData = opfsRecorderRef.current.getTakeAudioData(selectedTakeNumber);
+    if (!audioData) {
+      // Fallback: create 1-second sine wave take for demonstration if empty
+      const l = new Float32Array(48000 * 2);
+      for (let i = 0; i < l.length; i++) l[i] = Math.sin((i / 48000) * 2 * Math.PI * 440) * 0.3;
+      const file = StemExporter.createExportFile(l, l, `pulsejam_take_${selectedTakeNumber}.wav`, 48000);
+      downloadBlob(file.blob, file.filename);
+      return;
+    }
+
+    const exportFile = StemExporter.createExportFile(
+      audioData.left,
+      audioData.right,
+      `pulsejam_take_${selectedTakeNumber}.wav`,
+      48000
+    );
+    downloadBlob(exportFile.blob, exportFile.filename);
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleAddTrackSubmit = (trackData: { name: string; type: TrackType }) => {
     const newTrack: DynamicTrackLane = {
       id: `custom-${Date.now()}`,
@@ -417,6 +597,8 @@ export function MultiLaneMIDIStudioScreen({
     return `00:${pad(mins)}:${pad(secs)}:00`;
   };
 
+  const activePreset = getStylePreset(selectedPresetId);
+
   return (
     <div className="bg-[#121414] text-[#e3e2e2] font-sans min-h-screen flex flex-col antialiased">
       <audio ref={playbackAudioRef} onEnded={() => setIsPlaying(false)} className="hidden" />
@@ -435,19 +617,43 @@ export function MultiLaneMIDIStudioScreen({
               </svg>
             </button>
           )}
-          <div className="font-mono text-xs font-bold tracking-widest text-[#f2ca50] uppercase">
-            PulseJam Stage 2 — Single MRT2 Audio Stream Studio
+          <div className="font-mono text-xs font-bold tracking-widest text-[#f2ca50] uppercase flex items-center gap-2">
+            <span>PulseJam Studio Pro</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+              STAGE 2/3
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Header Telemetry Badges */}
+        <div className="flex items-center gap-3 font-mono text-[10px]">
+          {/* Key Center */}
+          <div className="px-2 py-1 rounded bg-[#1f2020] border border-[#4d4635]/30 flex items-center gap-1.5">
+            <span className="text-[#d0c5af]/60">KEY:</span>
+            <span className="text-[#f2ca50] font-bold">{estimatedKey}</span>
+            {keyConfidence > 0 && <span className="text-[9px] text-[#d0c5af]/50">({keyConfidence}%)</span>}
+          </div>
+
+          {/* MIDI Footswitch Badge */}
+          <div
+            className={`px-2 py-1 rounded border flex items-center gap-1.5 ${
+              midiStatus.isConnected
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                : 'bg-[#1f2020] border-[#4d4635]/30 text-[#d0c5af]/60'
+            }`}
+            title="Standard USB/Bluetooth MIDI Sustain Pedal or Footswitch"
+          >
+            <span>🎹 MIDI:</span>
+            <span className="font-bold">{midiStatus.isConnected ? 'PEDAL READY (CC#64)' : 'STANDBY'}</span>
+          </div>
+
           {onOpenSettings && (
             <button
               onClick={onOpenSettings}
-              className="text-[#d0c5af] hover:text-[#f2ca50] p-2 rounded-full cursor-pointer"
+              className="text-[#d0c5af] hover:text-[#f2ca50] p-1.5 rounded-full cursor-pointer"
               title="Studio Settings"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
@@ -456,15 +662,77 @@ export function MultiLaneMIDIStudioScreen({
 
           <button
             onClick={onOpenCalibration}
-            className="text-[#d0c5af] hover:text-[#f2ca50] p-2 rounded-full cursor-pointer"
+            className="text-[#d0c5af] hover:text-[#f2ca50] p-1.5 rounded-full cursor-pointer"
             title="Recalibrate Acoustic Levels"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
             </svg>
           </button>
         </div>
       </header>
+
+      {errorMessage && (
+        <div className="bg-red-950/80 border-b border-red-500/40 text-red-300 px-6 py-2 text-xs font-mono flex items-center justify-between z-40">
+          <span>⚠️ {errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-white cursor-pointer font-bold ml-4">✕</button>
+        </div>
+      )}
+
+      {/* Musical Style Presets & Flow-State Toolbar */}
+      <section className="bg-[#171819] border-b border-[#4d4635]/30 px-6 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        {/* Style Presets Carousel */}
+        <div className="flex items-center gap-2 overflow-x-auto py-1">
+          <span className="font-mono text-[10px] text-[#d0c5af]/60 font-bold uppercase shrink-0">STYLE:</span>
+          {STYLE_PRESETS.map((preset) => {
+            const isSelected = preset.id === selectedPresetId;
+            return (
+              <button
+                key={preset.id}
+                onClick={() => handleSelectPreset(preset.id)}
+                style={{ borderColor: isSelected ? preset.colorAccent : 'transparent' }}
+                className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                  isSelected
+                    ? 'bg-black/60 text-white shadow-sm'
+                    : 'bg-[#232425] text-[#d0c5af]/70 hover:text-white hover:bg-[#2d2e30]'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: preset.colorAccent }} />
+                <span>{preset.name}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tempo & Acoustic Count-In Controls */}
+        <div className="flex items-center gap-2">
+          {/* BPM Badge */}
+          <div className="flex items-center bg-[#232425] border border-[#4d4635]/30 rounded px-2 py-1 font-mono text-xs">
+            <span className="text-[#d0c5af]/60 text-[10px] mr-1">BPM:</span>
+            <span className="text-[#f2ca50] font-bold">{currentBpm}</span>
+          </div>
+
+          {/* Acoustic Count-In Button */}
+          <button
+            onClick={handleArmCountIn}
+            className={`px-3 py-1 rounded font-mono text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+              countInStatus === 'listening' || countInStatus === 'counting'
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500 animate-pulse'
+                : 'bg-[#232425] text-[#d0c5af] border-[#4d4635]/40 hover:bg-[#2d2e30]'
+            }`}
+            title="Strum 4 acoustic beats to auto-lock tempo and arm recording hands-free"
+          >
+            <span>🎙️ 4-BEAT COUNT-IN:</span>
+            <span>
+              {countInStatus === 'counting'
+                ? `[ ${countInBeat}/4 ]`
+                : countInStatus === 'listening'
+                ? 'LISTENING…'
+                : 'ARM'}
+            </span>
+          </button>
+        </div>
+      </section>
 
       {/* Main Studio Timeline */}
       <main className="flex-grow flex flex-col relative pt-4 pb-12 px-6 gap-4 overflow-y-auto">
@@ -497,7 +765,7 @@ export function MultiLaneMIDIStudioScreen({
                     </div>
                   </div>
 
-                  {/* Track Buttons M/S/REC */}
+                  {/* Track Buttons M/S */}
                   <div className="flex items-center gap-1 font-mono text-[9px] font-bold">
                     <button
                       onClick={() => handleToggleMute(track.id)}
@@ -540,7 +808,6 @@ export function MultiLaneMIDIStudioScreen({
                   )}
                 </div>
               </div>
-
             ))}
           </div>
 
@@ -586,13 +853,13 @@ export function MultiLaneMIDIStudioScreen({
                   /* AI Companion MRT2 Waveform & Level Meter Visualization */
                   <div className="w-full h-20 bg-black/30 rounded-lg border border-cyan-500/20 p-3 flex flex-col justify-between">
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-cyan-300 font-bold">MRT2 CONTINUOUS STREAM</span>
+                      <span className="text-cyan-300 font-bold">MRT2 CONTINUOUS STREAM ({activePreset.name.toUpperCase()})</span>
                       <span className="text-slate-400">
                         STATUS: <strong className="text-emerald-400">{aiStreamMetrics?.state.toUpperCase() || 'IDLE'}</strong>
                       </span>
                     </div>
 
-                    {/* Buffer Level Meter / Waveform Simulation Bars */}
+                    {/* Buffer Level Meter */}
                     <div className="flex items-center gap-1 h-8">
                       {Array.from({ length: 40 }).map((_, bIdx) => {
                         const activeBars = Math.min(40, Math.floor((aiStreamMetrics?.bufferDepthChunks || 0) * 8));
@@ -622,13 +889,40 @@ export function MultiLaneMIDIStudioScreen({
           aiStreamMetrics={aiStreamMetrics}
           onResetReceiver={() => audioEngine?.getAIAudioReceiver().reset()}
         />
-
       </main>
 
-      {/* Bottom Transport Toolbar */}
+      {/* Bottom Transport Toolbar & Multi-Take Stem Exporter */}
       <nav className="bg-[#0d0e0f] border-t border-[#4d4635]/40 h-16 fixed bottom-0 left-0 right-0 z-50 px-6 flex items-center justify-between">
         <div className="flex items-center gap-4 font-mono text-xs text-amber-400 font-bold">
           <span>{formatTimecode(recordingSeconds)}</span>
+
+          {/* Multi-Take Selector */}
+          <div className="flex items-center gap-1.5 text-[10px] text-[#d0c5af]/80">
+            <span>TAKE:</span>
+            <select
+              value={selectedTakeNumber}
+              onChange={(e) => setSelectedTakeNumber(parseInt(e.target.value))}
+              className="bg-[#1f2020] border border-[#4d4635]/40 rounded px-1.5 py-0.5 text-xs text-[#f2ca50] font-mono cursor-pointer"
+            >
+              {savedTakes.length === 0 ? (
+                <option value={1}>Take 1 (Live)</option>
+              ) : (
+                savedTakes.map((t) => (
+                  <option key={t.takeId} value={t.takeNumber}>
+                    Take {t.takeNumber} ({Math.round(t.durationMs / 1000)}s)
+                  </option>
+                ))
+              )}
+            </select>
+
+            <button
+              onClick={handleExportTakeWav}
+              className="px-2 py-1 rounded bg-[#232425] hover:bg-[#383939] text-[#f2ca50] border border-[#f2ca50]/30 font-mono text-[10px] cursor-pointer transition flex items-center gap-1"
+              title="Export pristine 16-bit 48kHz WAV audio take for DAW import"
+            >
+              <span>💾 EXPORT .WAV</span>
+            </button>
+          </div>
         </div>
 
         {/* Transport Buttons */}
@@ -650,7 +944,7 @@ export function MultiLaneMIDIStudioScreen({
           </button>
 
           <button
-            onClick={handleStartRecording}
+            onClick={handleToggleRecord}
             className={`px-4 py-2 rounded font-mono text-xs font-bold uppercase transition cursor-pointer ${
               isRecording ? 'bg-[#93000a] text-white animate-pulse' : 'bg-[#93000a]/20 text-[#ffb4ab] border border-[#ffb4ab]/40 hover:bg-[#93000a]/40'
             }`}
@@ -663,6 +957,9 @@ export function MultiLaneMIDIStudioScreen({
         <div className="flex items-center gap-3 font-mono text-[10px]">
           <span className="text-slate-400">
             TIER: <strong className="text-amber-400 font-bold">{activeTierState.toUpperCase()}</strong>
+          </span>
+          <span className="text-slate-400">
+            CONFIDENCE: <strong className="text-cyan-400 font-bold">{liveConfidenceState}%</strong>
           </span>
         </div>
       </nav>

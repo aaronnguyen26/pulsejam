@@ -8,6 +8,19 @@ export type OperatingMode = 'LIVE' | 'CALIBRATING' | 'OVERRIDE';
 
 export type AppMode = 'stems' | 'ai-gen';
 
+// ─── Binary Protocol Constants & Enums ──────────────────────────────────────
+export const BINARY_MAGIC = 0x504a; // 'PJ' in ASCII (0x50, 0x4A)
+export const BINARY_HEADER_SIZE = 16; // 16-byte fixed header
+
+export enum BinaryMessageType {
+  AUDIO_CHUNK = 0x0001,
+  PING = 0x0002,
+  PONG = 0x0003,
+  AUTH_CHALLENGE = 0x0004,
+  AUTH_RESPONSE = 0x0005,
+  CONFIG = 0x0006,
+}
+
 export interface CalibrationData {
   quietDb: number;
   normalDb: number;
@@ -24,16 +37,22 @@ export interface CalibrationData {
 
 export interface ConditioningFrame {
   pitchState: number[]; // 128-length array following General MIDI note numbering (-1=masked/unconditioned, 0=off, 1=sustain, 2=onset, 3=free play)
-  stylePrompt: string;  // derived from current tier
+  stylePrompt: string;  // derived from current tier or active style preset
   timestamp: number;    // frame timestamp (ms)
   mode: 'midi+audio' | 'audio-only'; // live-gated mode
+  // Phase 2 Harmonic & Rhythmic Extensions
+  chromaVector?: number[]; // 12-element Pitch Class Profile (C to B)
+  estimatedKey?: string;   // e.g. "A Minor", "C Major", "E Dorian"
+  estimatedBpm?: number;   // Real-time detected tempo (e.g. 120.5)
 }
 
-export type SidecarConnectionState = 'unavailable' | 'connecting' | 'connected' | 'high-latency';
+export type SidecarConnectionState = 'unavailable' | 'connecting' | 'connected' | 'high-latency' | 'auth-failed';
 
 export interface SidecarStatus {
   state: SidecarConnectionState;
   roundTripMs?: number;
+  authenticated?: boolean;
+  serverVersion?: string;
 }
 
 export type AIAudioStreamState = 'idle' | 'buffering' | 'streaming' | 'stalled';
@@ -44,8 +63,8 @@ export interface AIAudioStreamMetrics {
   bufferDepthChunks: number;
   underrunCount: number;
   lastChunkTimestamp: number;
+  isBinaryStream?: boolean;
 }
-
 
 export interface DSPMetrics {
   rawRmsDb: number;
@@ -63,6 +82,10 @@ export interface DSPMetrics {
   currentPitch?: number | null;     // MIDI note (e.g. 60 = C4)
   currentFrequency?: number | null; // Hz (e.g. 261.63)
   pitchConfidence?: number;        // YIN clarity 0..1
+  // Phase 2 Harmonic & Rhythmic Additions
+  chromaVector?: number[];         // 12-element Chroma array
+  estimatedKey?: string;           // Key center name
+  detectedBpm?: number;            // Current detected tempo
 }
 
 export interface LatencyLogEntry {
@@ -72,8 +95,6 @@ export interface LatencyLogEntry {
   deltaMs: number;
   timestamp: number;
 }
-
-
 
 export interface TierChangeEvent {
   previousTier: PerformanceTier;
@@ -103,3 +124,34 @@ export interface AudioEngineStatus {
   errorType: AudioErrorType;
   errorMessage: string | null;
 }
+
+// ─── Phase 2: Style Preset Types ────────────────────────────────────────────
+export interface StylePreset {
+  id: string;
+  name: string;
+  category: 'Lo-Fi' | 'Rock' | 'Soul' | 'Electronic' | 'Ambient' | 'Jazz';
+  description: string;
+  tags: string[];
+  tierPrompts: Record<PerformanceTier, string>;
+  defaultBpm: number;
+  colorAccent: string;
+}
+
+// ─── Phase 3: Hardware & Export Types ───────────────────────────────────────
+export interface MIDIFootswitchAction {
+  ccNumber: number;
+  action: 'TOGGLE_RECORD' | 'TIER_UP' | 'TIER_DOWN' | 'COUNT_IN' | 'MUTE_MIC' | 'MUTE_AI';
+  label: string;
+}
+
+export interface JamTakeMetadata {
+  takeId: string;
+  takeNumber: number;
+  startTime: number;
+  durationMs: number;
+  sampleRate: number;
+  channelCount: number;
+  blobUrl?: string;
+  fileSizeEstimate: number;
+}
+

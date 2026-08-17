@@ -1,13 +1,10 @@
-/**
- * PulseJam Stage 2 — AIAudioReceiver
- *
- * Standalone receiver component for MRT2 continuous audio generation.
- * Accepts 40ms PCM audio chunks (float32, 48kHz, stereo, 1920 samples/channel)
- * and schedules them into WebAudio via an AudioWorkletNode with jitter buffering,
- * sequence gap tracking, stream restart detection, and real-time metrics.
- */
-
-import { AIAudioStreamMetrics, AIAudioStreamState } from './types';
+import {
+  AIAudioStreamMetrics,
+  AIAudioStreamState,
+  BINARY_MAGIC,
+  BINARY_HEADER_SIZE,
+  BinaryMessageType,
+} from './types';
 
 export interface ChunkPayload {
   pcmData: Float32Array | Float32Array[] | ArrayBuffer;
@@ -44,6 +41,7 @@ export class AIAudioReceiver {
   private lastChunkTimestamp = 0;
   private underrunCount = 0;
   private currentState: AIAudioStreamState = 'idle';
+  private isBinaryStream = false;
 
   // WebAudio Integration
   private ctx: AudioContext | null = null;
@@ -60,6 +58,46 @@ export class AIAudioReceiver {
   }
 
   /**
+   * Dedicated zero-copy binary frame ingestion.
+   * Parses 16-byte header [Magic: 2B (0x504A) | MsgType: 2B | Seq: 4B | Timestamp: 8B]
+   * followed by interleaved Float32 PCM payload.
+   */
+  public pushBinaryChunk(buffer: ArrayBuffer): boolean {
+    if (!buffer || buffer.byteLength < BINARY_HEADER_SIZE) {
+      return false;
+    }
+
+    const dataView = new DataView(buffer);
+    const magic = dataView.getUint16(0, false); // big-endian
+    if (magic !== BINARY_MAGIC) {
+      // Fallback: treat as raw Float32 array without header
+      const seq = this.expectedSequenceNumber ?? 0;
+      this.pushChunk(buffer, seq);
+      return true;
+    }
+
+    const msgType = dataView.getUint16(2, false);
+    if (msgType !== BinaryMessageType.AUDIO_CHUNK) {
+      return false; // Not an audio chunk frame (e.g. pong/auth handled separately)
+    }
+
+    const seq = dataView.getUint32(4, false);
+    const tsHigh = dataView.getUint32(8, false);
+    const tsLow = dataView.getUint32(12, false);
+    const timestamp = tsHigh * 4294967296 + tsLow;
+
+    this.isBinaryStream = true;
+
+    // Zero-copy Float32 view of the PCM payload
+    const pcmBytes = buffer.byteLength - BINARY_HEADER_SIZE;
+    const floatCount = Math.floor(pcmBytes / 4);
+    const floatView = new Float32Array(buffer, BINARY_HEADER_SIZE, floatCount);
+
+    this.pushChunk(floatView, seq, timestamp);
+    return true;
+  }
+
+  /**
    * Generic chunk-feeding interface. Accepts 40ms PCM audio chunks.
    */
   public pushChunk(
@@ -69,6 +107,15 @@ export class AIAudioReceiver {
   ): void {
     const now = timestamp ?? Date.now();
     this.lastChunkTimestamp = now;
+
+    // If given ArrayBuffer, check if it contains the binary magic header
+    if (pcmData instanceof ArrayBuffer && pcmData.byteLength >= BINARY_HEADER_SIZE) {
+      const dv = new DataView(pcmData);
+      if (dv.getUint16(0, false) === BINARY_MAGIC) {
+        this.pushBinaryChunk(pcmData);
+        return;
+      }
+    }
 
     // Parse incoming PCM audio into standardized left & right Float32Arrays
     const parsed = this.parsePCMData(pcmData, sequenceNumber, now);
@@ -170,6 +217,7 @@ export class AIAudioReceiver {
     this.resetInternalBuffer();
     this.underrunCount = 0;
     this.currentState = 'idle';
+    this.isBinaryStream = false;
     this.notifyMetrics();
   }
 
@@ -224,6 +272,7 @@ export class AIAudioReceiver {
       bufferDepthChunks,
       underrunCount: this.underrunCount,
       lastChunkTimestamp: this.lastChunkTimestamp,
+      isBinaryStream: this.isBinaryStream,
     };
   }
 
@@ -296,3 +345,4 @@ export class AIAudioReceiver {
     };
   }
 }
+

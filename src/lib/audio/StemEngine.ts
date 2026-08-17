@@ -137,7 +137,6 @@ export class StemEngine {
       const gainNode = this.gainNodes[tier];
       if (!gainNode) return;
 
-      const currentGain = gainNode.gain.value;
       gainNode.gain.cancelScheduledValues(now);
 
       if (tier === targetTier) {

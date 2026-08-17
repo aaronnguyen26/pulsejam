@@ -35,7 +35,7 @@ function createMockIndexedDB() {
   };
 
   return {
-    open: (name: string, version: number) => {
+    open: (_name: string, _version?: number) => {
       const req = {
         result: db,
         onsuccess: null as any,

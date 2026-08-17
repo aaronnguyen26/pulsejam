@@ -35,7 +35,6 @@ export function RefinedCalibrationModal({
 }: RefinedCalibrationModalProps) {
   const [step, setStep] = useState<CalibrationStep>('intro');
   const [countdown, setCountdown] = useState(5);
-  const [currentRmsDb, setCurrentRmsDb] = useState(-80);
   const [livePitchConfidence, setLivePitchConfidence] = useState<number>(0);
   const [liveDetectedNote, setLiveDetectedNote] = useState<number | null>(null);
 
@@ -85,7 +84,6 @@ export function RefinedCalibrationModal({
       smoothedRmsRef.current = smoothedRmsRef.current * 0.7 + metrics.rawRmsDb * 0.3;
       setSmoothedRmsDb(smoothedRmsRef.current);
 
-      setCurrentRmsDb(metrics.rawRmsDb);
       setLivePitchConfidence(metrics.pitchConfidence || 0);
       setLiveDetectedNote(metrics.currentPitch || null);
 

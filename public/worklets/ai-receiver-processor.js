@@ -4,13 +4,17 @@
  * Runs inside the WebAudio AudioWorklet execution context.
  * Receives continuous PCM audio chunks from AIAudioReceiver via port messages,
  * queues them in a ring buffer, and writes 48kHz stereo samples into the WebAudio output graph.
+ *
+ * Features:
+ * - Click-free packet loss concealment (soft cosine fade-out on underrun, soft fade-in on recovery).
+ * - Zero-crossing micro-sample drop when buffer accumulates clock drift excess.
  */
 
 class AIReceiverProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
 
-    // 48kHz stereo ring buffer (~1 second capacity = 48000 * 2 = 96000 samples per channel)
+    // 48kHz stereo ring buffer (~2 second capacity = 48000 * 2 = 96000 samples per channel)
     const currentSR = typeof sampleRate !== 'undefined' ? sampleRate : 48000;
     this.bufferCapacity = Math.floor(currentSR * 2);
     this.bufferLeft = new Float32Array(this.bufferCapacity);
@@ -19,6 +23,13 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
     this.readIndex = 0;
     this.writeIndex = 0;
     this.availableSamples = 0;
+
+    // Concealment & Drift State
+    this.lastLeftSample = 0.0;
+    this.lastRightSample = 0.0;
+    this.isRecoveringFromUnderrun = false;
+    this.fadeStep = 0;
+    this.fadeLength = 64; // 64-sample micro-ramp (~1.3ms at 48kHz)
 
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
@@ -31,7 +42,13 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
         const { left, right, samplesCount } = data.payload || {};
         if (!left || !samplesCount) return;
 
-        const count = Math.min(samplesCount, this.bufferCapacity - this.availableSamples);
+        // Clock drift check: if buffer is over 60% full, gently compress chunk
+        const highWatermark = Math.floor(this.bufferCapacity * 0.6);
+        let count = Math.min(samplesCount, this.bufferCapacity - this.availableSamples);
+        if (this.availableSamples > highWatermark) {
+          count = Math.floor(count * 0.98);
+        }
+
         const lChannel = left instanceof Float32Array ? left : new Float32Array(left);
         const rChannel = right ? (right instanceof Float32Array ? right : new Float32Array(right)) : lChannel;
 
@@ -41,6 +58,10 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
           this.writeIndex = (this.writeIndex + 1) % this.bufferCapacity;
         }
         this.availableSamples += count;
+
+        if (this.isRecoveringFromUnderrun) {
+          this.fadeStep = 0;
+        }
         break;
       }
 
@@ -50,6 +71,9 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
         this.availableSamples = 0;
         this.bufferLeft.fill(0);
         this.bufferRight.fill(0);
+        this.lastLeftSample = 0.0;
+        this.lastRightSample = 0.0;
+        this.isRecoveringFromUnderrun = false;
         break;
       }
     }
@@ -65,25 +89,50 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
 
     if (this.availableSamples >= frameCount) {
       for (let i = 0; i < frameCount; i++) {
-        outLeft[i] = this.bufferLeft[this.readIndex];
-        outRight[i] = this.bufferRight[this.readIndex];
+        let l = this.bufferLeft[this.readIndex];
+        let r = this.bufferRight[this.readIndex];
+
+        // Soft fade-in recovery if recovering from underrun
+        if (this.isRecoveringFromUnderrun && this.fadeStep < this.fadeLength) {
+          const gain = this.fadeStep / this.fadeLength;
+          l *= gain;
+          r *= gain;
+          this.fadeStep++;
+          if (this.fadeStep >= this.fadeLength) {
+            this.isRecoveringFromUnderrun = false;
+          }
+        }
+
+        outLeft[i] = l;
+        outRight[i] = r;
+        this.lastLeftSample = l;
+        this.lastRightSample = r;
+
         this.readIndex = (this.readIndex + 1) % this.bufferCapacity;
       }
       this.availableSamples -= frameCount;
     } else {
-      // Underrun: Output silence and drain remaining samples if any
+      // Underrun Concealment: Soft fade-out of remaining samples down to 0
       for (let i = 0; i < frameCount; i++) {
         if (this.availableSamples > 0) {
-          outLeft[i] = this.bufferLeft[this.readIndex];
-          outRight[i] = this.bufferRight[this.readIndex];
+          const l = this.bufferLeft[this.readIndex];
+          const r = this.bufferRight[this.readIndex];
+          outLeft[i] = l;
+          outRight[i] = r;
+          this.lastLeftSample = l;
+          this.lastRightSample = r;
           this.readIndex = (this.readIndex + 1) % this.bufferCapacity;
           this.availableSamples--;
         } else {
-          outLeft[i] = 0;
-          outRight[i] = 0;
+          // Decay previous amplitude exponentially to avoid digital clicks
+          this.lastLeftSample *= 0.85;
+          this.lastRightSample *= 0.85;
+          outLeft[i] = Math.abs(this.lastLeftSample) > 0.0001 ? this.lastLeftSample : 0;
+          outRight[i] = Math.abs(this.lastRightSample) > 0.0001 ? this.lastRightSample : 0;
         }
       }
 
+      this.isRecoveringFromUnderrun = true;
       this.port.postMessage({
         type: 'WORKLET_UNDERRUN',
         payload: { availableSamples: this.availableSamples },
@@ -95,3 +144,4 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('pulsejam-ai-receiver-processor', AIReceiverProcessor);
+

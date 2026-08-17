@@ -18,6 +18,7 @@ import { AIAudioReceiver } from './AIAudioReceiver';
 
 export interface ConditioningBridgeOptions {
   wsUrl?: string;
+  authToken?: string;
   tickIntervalMs?: number;
   debugMode?: boolean;
   tierPromptMap?: Record<PerformanceTier, string>;
@@ -40,6 +41,7 @@ const DEFAULT_TIER_PROMPTS: Record<PerformanceTier, string> = {
 
 export class ConditioningBridge {
   private wsUrl: string;
+  private authToken?: string;
   private tickIntervalMs: number;
   private debugMode: boolean;
   private tierPromptMap: Record<PerformanceTier, string>;
@@ -80,6 +82,7 @@ export class ConditioningBridge {
 
   constructor(options: ConditioningBridgeOptions = {}) {
     this.wsUrl = options.wsUrl || 'ws://localhost:9090';
+    this.authToken = options.authToken;
     this.tickIntervalMs = options.tickIntervalMs || 40;
     this.debugMode = options.debugMode ?? true;
     this.tierPromptMap = options.tierPromptMap || DEFAULT_TIER_PROMPTS;
@@ -90,6 +93,10 @@ export class ConditioningBridge {
     this.confidenceSustainTicks = options.confidenceSustainTicks || 5;
     this.latencyThresholdMs = options.latencyThresholdMs || 100;
     this.metricsStalenessMs = options.metricsStalenessMs || 200;
+  }
+
+  public setAuthToken(token?: string) {
+    this.authToken = token;
   }
 
   public start() {
@@ -105,49 +112,72 @@ export class ConditioningBridge {
     this.disconnect();
   }
 
-  public setCalibrationCeiling(mode: 'midi+audio' | 'audio-only') {
-    this.calibrationCeiling = mode;
-    if (mode === 'audio-only') {
+  public setTierPromptMap(map: Record<PerformanceTier, string>) {
+    this.tierPromptMap = { ...this.tierPromptMap, ...map };
+  }
+
+  public setCalibrationCeiling(ceiling: 'midi+audio' | 'audio-only') {
+    this.calibrationCeiling = ceiling;
+    if (ceiling === 'audio-only') {
       this.currentLiveMode = 'audio-only';
     }
   }
 
-  public setAIAudioReceiver(receiver: AIAudioReceiver | null) {
+  public attachAIAudioReceiver(receiver: AIAudioReceiver | null) {
     this.aiAudioReceiver = receiver;
+  }
+
+  public setAIAudioReceiver(receiver: AIAudioReceiver | null) {
+    this.attachAIAudioReceiver(receiver);
   }
 
   public getAIAudioReceiver(): AIAudioReceiver | null {
     return this.aiAudioReceiver;
   }
 
-
-  public processMetrics(metrics: DSPMetrics) {
-    this.latestMetrics = metrics;
+  public updateMetrics(metrics: DSPMetrics) {
+    this.latestMetrics = {
+      ...metrics,
+      wallClockTimestamp: metrics.wallClockTimestamp ?? Date.now(),
+    };
     if (metrics.calibration && metrics.calibration.conditioningMode) {
       this.calibrationCeiling = metrics.calibration.conditioningMode;
     }
   }
 
+  public processMetrics(metrics: DSPMetrics) {
+    this.updateMetrics(metrics);
+  }
+
   private onTick() {
     const now = Date.now();
-    const isStalled =
-      !this.latestMetrics ||
-      (this.latestMetrics.wallClockTimestamp !== undefined &&
-        now - this.latestMetrics.wallClockTimestamp > this.metricsStalenessMs);
+    const metrics = this.latestMetrics;
+
+    const isStale =
+      !metrics ||
+      !metrics.wallClockTimestamp ||
+      now - metrics.wallClockTimestamp > this.metricsStalenessMs;
 
     let pitchState: number[];
-    let effectiveMode: 'midi+audio' | 'audio-only';
     let stylePrompt: string;
+    let effectiveMode: 'midi+audio' | 'audio-only';
+    let chromaVector: number[] | undefined = undefined;
+    let estimatedKey: string | undefined = undefined;
+    let estimatedBpm: number | undefined = undefined;
 
-    if (isStalled) {
-      pitchState = new Array<number>(128).fill(-1);
+    if (isStale || !metrics) {
+      // Metric Staleness Fallback -> audio-only with all pitch states masked (-1)
+      this.currentLiveMode = 'audio-only';
       effectiveMode = 'audio-only';
-      const tier = this.latestMetrics?.activeTier || 'chill';
-      stylePrompt = this.tierPromptMap[tier] || DEFAULT_TIER_PROMPTS.chill;
+      pitchState = new Array<number>(128).fill(-1);
+      stylePrompt = DEFAULT_TIER_PROMPTS.chill;
+      this.prevPitch = null;
     } else {
-      const metrics = this.latestMetrics!;
       const pitch = metrics.currentPitch ?? null;
       const confidence = metrics.pitchConfidence ?? 0;
+      chromaVector = metrics.chromaVector;
+      estimatedKey = metrics.estimatedKey;
+      estimatedBpm = metrics.detectedBpm;
 
       // 1. Update Confidence Rolling Window & Live Gating Mode
       this.updateConfidenceMode(confidence);
@@ -179,6 +209,9 @@ export class ConditioningBridge {
       stylePrompt,
       timestamp: now,
       mode: effectiveMode,
+      chromaVector,
+      estimatedKey,
+      estimatedBpm,
     };
 
     // 6. Forward Frame to Subscribers & Sidecar WebSocket
@@ -239,12 +272,25 @@ export class ConditioningBridge {
     this.setStatus({ state: 'connecting' });
 
     try {
-      this.socket = new WebSocket(this.wsUrl);
+      let targetUrl = this.wsUrl;
+      if (this.authToken) {
+        const separator = targetUrl.includes('?') ? '&' : '?';
+        targetUrl = `${targetUrl}${separator}token=${encodeURIComponent(this.authToken)}`;
+      }
+
+      this.socket = new WebSocket(targetUrl);
+      this.socket.binaryType = 'arraybuffer';
 
       this.socket.onopen = () => {
         this.reconnectDelayMs = 2000;
         this.pingTimestamp = Date.now();
-        this.socket?.send(JSON.stringify({ type: 'ping', timestamp: this.pingTimestamp }));
+        this.socket?.send(
+          JSON.stringify({
+            type: 'ping',
+            timestamp: this.pingTimestamp,
+            token: this.authToken,
+          })
+        );
       };
 
       this.socket.onmessage = (event) => {
@@ -256,21 +302,47 @@ export class ConditioningBridge {
               const state: SidecarConnectionState =
                 rtt > this.latencyThresholdMs ? 'high-latency' : 'connected';
               this.reconnectDelayMs = 2000;
-              this.setStatus({ state, roundTripMs: rtt });
-            } else if (msg.type === 'AUDIO_CHUNK' || msg.type === 'AUDIO_FRAME' || msg.type === 'audio') {
+              this.setStatus({ state, roundTripMs: rtt, authenticated: msg.authenticated ?? true });
+            } else if (msg.type === 'sidecar_status') {
+              if (msg.authRequired && !msg.authenticated) {
+                this.setStatus({ state: 'auth-failed' });
+              } else {
+                this.setStatus({
+                  state: 'connected',
+                  authenticated: msg.authenticated ?? true,
+                  serverVersion: msg.version,
+                });
+              }
+            } else if (msg.type === 'AUTH_FAILED') {
+              this.setStatus({ state: 'auth-failed' });
+            } else if (
+              msg.type === 'AUDIO_CHUNK' ||
+              msg.type === 'AUDIO_FRAME' ||
+              msg.type === 'audio'
+            ) {
               if (this.aiAudioReceiver) {
                 const seq = msg.sequenceNumber ?? msg.seq ?? this.receivedAudioSeq++;
-                this.aiAudioReceiver.pushChunk(msg.pcmData || msg.audio || msg.data, seq, msg.timestamp);
+                this.aiAudioReceiver.pushChunk(
+                  msg.pcmData || msg.audio || msg.data,
+                  seq,
+                  msg.timestamp
+                );
               }
             }
           } else if (event.data instanceof ArrayBuffer) {
             if (this.aiAudioReceiver) {
-              this.aiAudioReceiver.pushChunk(event.data, this.receivedAudioSeq++);
+              const handled = this.aiAudioReceiver.pushBinaryChunk(event.data);
+              if (!handled) {
+                this.aiAudioReceiver.pushChunk(event.data, this.receivedAudioSeq++);
+              }
             }
           } else if (typeof Blob !== 'undefined' && event.data instanceof Blob) {
             event.data.arrayBuffer().then((ab) => {
               if (this.aiAudioReceiver) {
-                this.aiAudioReceiver.pushChunk(ab, this.receivedAudioSeq++);
+                const handled = this.aiAudioReceiver.pushBinaryChunk(ab);
+                if (!handled) {
+                  this.aiAudioReceiver.pushChunk(ab, this.receivedAudioSeq++);
+                }
               }
             });
           }

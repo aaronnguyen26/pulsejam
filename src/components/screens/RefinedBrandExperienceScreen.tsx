@@ -627,7 +627,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                         </span>
                         <h3 className="font-headline-sm text-2xl md:text-5xl text-[#e5e2e1]">The Live Companion</h3>
                         <p className="font-body-md text-sm md:text-lg text-[#d0c5af] max-w-lg leading-relaxed">
-                          Take it to the stage. PulseJam acts as an invisible safety net, generating stems that align perfectly with your live band's tempo fluctuations, ensuring a remarkably tight sound.
+                          Take it to the stage. PulseJam acts as an invisible safety net, generating stems that align perfectly with your live band&apos;s tempo fluctuations, ensuring a remarkably tight sound.
                         </p>
                       </div>
                     </div>
@@ -667,7 +667,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
               </h2>
 
               <p className="font-body-md text-base md:text-lg text-[#d0c5af] leading-relaxed">
-                Creative integrity demands a secure environment. PulseJam AI operates entirely on local processing. We don't upload your audio to external cloud servers or harvest your riffs.
+                Creative integrity demands a secure environment. PulseJam AI operates entirely on local processing. We don&apos;t upload your audio to external cloud servers or harvest your riffs.
               </p>
 
               <ul className="space-y-4 pt-2 text-left">
