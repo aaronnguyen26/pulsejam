@@ -49,6 +49,11 @@ export function ImmersiveWelcomeHomeScreen({
       <main className="z-10 flex flex-col items-center justify-center w-full max-w-4xl px-6 h-full gap-12 relative text-center">
         {/* Title */}
         <div className="flex flex-col items-center justify-center gap-3">
+          <img
+            src="/pulsejam_app_logo.jpg"
+            alt="PulseJam AI Logo"
+            className="w-20 h-20 rounded-2xl border-2 border-[#f2ca50]/50 shadow-[0_0_30px_rgba(242,202,80,0.3)] object-cover mb-2"
+          />
           <h1 className="font-serif text-5xl md:text-7xl font-bold tracking-tight text-[#f2ca50] drop-shadow-[0_0_24px_rgba(242,202,80,0.4)]">
             PulseJam <span className="font-light text-[#d0c5af]">AI</span>
           </h1>

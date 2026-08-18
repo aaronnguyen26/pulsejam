@@ -73,7 +73,7 @@ export function MultiLaneMIDIStudioScreen({
   ]);
 
   // Mix Gain Controls
-  const [micGain, setMicGain] = useState<number>(0.0);
+  const [micGain, setMicGain] = useState<number>(0.7);
   const [aiGain, setAiGain] = useState<number>(1.0);
 
   // In-Memory Live Audio Take & Waveform State
@@ -172,15 +172,18 @@ export function MultiLaneMIDIStudioScreen({
       onCountInBeat: (beat, bpm) => {
         setCountInBeat(beat);
         setCurrentBpm(bpm);
+        if (audioEngine) audioEngine.setBpm(bpm);
       },
       onCountInComplete: (lockedBpm) => {
         setCountInStatus('locked');
         setCountInBeat(0);
         setCurrentBpm(lockedBpm);
+        if (audioEngine) audioEngine.setBpm(lockedBpm);
         handleStartRecording();
       },
       onTempoUpdated: (bpm) => {
         setCurrentBpm(bpm);
+        if (audioEngine) audioEngine.setBpm(bpm);
       },
     });
     tempoTrackerRef.current = tracker;
@@ -214,7 +217,7 @@ export function MultiLaneMIDIStudioScreen({
     return () => {
       midi.disconnect();
     };
-  }, []);
+  }, [audioEngine]);
 
   const handleSelectPreset = (presetId: string) => {
     setSelectedPresetId(presetId);
@@ -225,6 +228,7 @@ export function MultiLaneMIDIStudioScreen({
         tempoTrackerRef.current.setBpm(preset.defaultBpm);
       }
       if (audioEngine) {
+        audioEngine.setBpm(preset.defaultBpm);
         const bridge = audioEngine.getConditioningBridge();
         if (bridge) {
           bridge.setTierPromptMap(preset.tierPrompts);
@@ -733,9 +737,28 @@ export function MultiLaneMIDIStudioScreen({
             <span className="font-bold">{midiStatus.isConnected ? 'PEDAL READY (CC#64)' : 'MIDI STANDBY'}</span>
           </div>
 
-          {/* On-Device MLX Latency Readout */}
-          <div className="px-2.5 py-1 rounded bg-[#1f1b13] border border-[#4d4635]/40 text-[#7bd0ff] font-bold flex items-center gap-1 shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
-            <span>⚡ 14ms MLX</span>
+          {/* Dynamic AI Latency & Companion Telemetry */}
+          <div
+            className={`px-2.5 py-1 rounded border font-bold flex items-center gap-1 shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)] ${
+              sidecarStatusState.state === 'connected'
+                ? 'bg-blue-950/40 border-blue-500/40 text-[#7bd0ff]'
+                : aiStreamMetrics?.state === 'streaming'
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                : 'bg-[#1f1b13] border-[#4d4635]/40 text-[#d0c5af]/70'
+            }`}
+            title={
+              sidecarStatusState.state === 'connected'
+                ? `Connected to local sidecar (${sidecarStatusState.roundTripMs ?? 15}ms RTT)`
+                : 'Running on in-browser neural accompaniment engine'
+            }
+          >
+            <span>
+              {sidecarStatusState.state === 'connected'
+                ? `⚡ ${sidecarStatusState.roundTripMs ?? 15}ms MLX`
+                : aiStreamMetrics?.state === 'streaming'
+                ? `⚡ ${aiStreamMetrics.bufferDepthMs || 40}ms Local AI`
+                : '⚡ Local AI Active'}
+            </span>
           </div>
 
           {onOpenSettings && (

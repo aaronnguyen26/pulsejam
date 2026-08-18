@@ -9,19 +9,24 @@ import { IStemProvider, StemBuffers } from './types';
  */
 export class SyntheticStemProvider implements IStemProvider {
   name = 'Synthetic (WebAudio Synthesis)';
+  private defaultBpm: number;
 
-  async loadStems(ctx: AudioContext): Promise<StemBuffers> {
+  constructor(bpm = 120) {
+    this.defaultBpm = bpm;
+  }
+
+  async loadStems(ctx: AudioContext, bpm?: number): Promise<StemBuffers> {
     const sampleRate = ctx.sampleRate;
-    const bpm = 120;
+    const targetBpm = bpm || this.defaultBpm || 120;
     const beatsPerBar = 4;
     const totalBars = 4;
-    const secondsPerBeat = 60 / bpm;
-    const durationSeconds = totalBars * beatsPerBar * secondsPerBeat; // 8 seconds
+    const secondsPerBeat = 60 / targetBpm;
+    const durationSeconds = totalBars * beatsPerBar * secondsPerBeat;
 
     const [chill, groove, peak] = await Promise.all([
-      this.renderStem(sampleRate, durationSeconds, bpm, 'chill'),
-      this.renderStem(sampleRate, durationSeconds, bpm, 'groove'),
-      this.renderStem(sampleRate, durationSeconds, bpm, 'peak'),
+      this.renderStem(sampleRate, durationSeconds, targetBpm, 'chill'),
+      this.renderStem(sampleRate, durationSeconds, targetBpm, 'groove'),
+      this.renderStem(sampleRate, durationSeconds, targetBpm, 'peak'),
     ]);
 
     return { chill, groove, peak };

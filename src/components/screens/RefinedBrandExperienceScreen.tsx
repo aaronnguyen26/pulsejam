@@ -134,11 +134,20 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
             <a href="#security" className="hover:text-[#f2ca50] transition-colors">Security</a>
           </div>
 
-          <div className="relative">
-            <button
-              onClick={() => setDownloadOpen((v) => !v)}
-              className="bg-gradient-brass text-[#3c2f00] font-label-caps text-[10px] md:text-xs px-4 md:px-8 py-2.5 md:py-3.5 rounded-full highlight-top uppercase tracking-widest font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(242,202,80,0.2)] flex items-center gap-1.5 md:gap-2 cursor-pointer"
+          <div className="flex items-center gap-3">
+            <a
+              href="/studio"
+              className="bg-[#2a271c] hover:bg-[#3d3725] text-[#f2ca50] border border-[#f2ca50]/40 font-label-caps text-[10px] md:text-xs px-3.5 md:px-5 py-2 md:py-2.5 rounded-full uppercase tracking-widest font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_10px_rgba(242,202,80,0.15)]"
             >
+              <span>Live Studio</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </a>
+
+            <div className="relative">
+              <button
+                onClick={() => setDownloadOpen((v) => !v)}
+                className="bg-gradient-brass text-[#3c2f00] font-label-caps text-[10px] md:text-xs px-4 md:px-7 py-2.5 md:py-2.5 rounded-full highlight-top uppercase tracking-widest font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(242,202,80,0.2)] flex items-center gap-1.5 md:gap-2 cursor-pointer"
+              >
               <span>Get PulseJam</span>
               <svg
                 width="16"
@@ -185,7 +194,8 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
             )}
           </div>
         </div>
-      </nav>
+      </div>
+    </nav>
 
       <main className="pt-16 md:pt-24 pb-20 md:pb-0">
         {/* ── Hero Section ────────────────────────────────────────────── */}
@@ -217,23 +227,26 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-4 md:pt-6 justify-center md:justify-start">
               <a
-                href="/downloads/PulseJam_0.1.0_aarch64.dmg"
-                download="PulseJam_0.1.0_aarch64.dmg"
+                href="/studio"
                 className="bg-gradient-brass text-[#3c2f00] font-label-caps text-xs px-8 md:px-10 py-4 md:py-5 rounded-full highlight-top uppercase tracking-widest font-bold hover:brightness-110 transition-all inline-flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(242,202,80,0.25)] hover:shadow-[0_0_40px_rgba(242,202,80,0.4)] cursor-pointer"
               >
-                <span>Experience PulseJam</span>
+                <span>Launch Live Jam Studio</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
+                  <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
                 </svg>
               </a>
 
-              <a
-                href="#experience"
-                className="bg-transparent border border-[#f2ca50]/50 text-[#f2ca50] font-label-caps text-xs px-8 md:px-10 py-4 md:py-5 rounded-full uppercase tracking-widest font-bold hover:bg-[#f2ca50]/5 hover:border-[#f2ca50] transition-all inline-flex items-center justify-center cursor-pointer"
+              <button
+                onClick={() => setDownloadOpen(true)}
+                className="bg-transparent border border-[#f2ca50]/50 text-[#f2ca50] font-label-caps text-xs px-8 md:px-10 py-4 md:py-5 rounded-full uppercase tracking-widest font-bold hover:bg-[#f2ca50]/5 hover:border-[#f2ca50] transition-all inline-flex items-center justify-center gap-2 cursor-pointer"
               >
-                Hear the Demo
-              </a>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Download App (.dmg)</span>
+              </button>
             </div>
           </motion.div>
         </section>

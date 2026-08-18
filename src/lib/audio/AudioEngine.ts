@@ -103,20 +103,16 @@ export class AudioEngine {
         return false;
       }
 
-      // 1. Initialize Stage 1 Stem Engine
-      this.stemEngine = new StemEngine(this.ctx);
-      await this.loadStems(stemSource);
-
-      // 2. Setup Stage 2 Mixer Stage & Phase 4 Mastering Chain
+      // 1. Setup Stage 2 Mixer Stage & Phase 4 Mastering Chain
       this.masterGainNode = this.ctx.createGain();
       this.micGainNode = this.ctx.createGain();
       this.micCompressorNode = this.ctx.createDynamicsCompressor();
       this.aiGainNode = this.ctx.createGain();
 
       this.masterGainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
-      // Default live mic monitoring gain to 0.0 (silent) on session start to avoid feedback
-      this.micGainNode.gain.value = 0.0;
-      this.micGainNode.gain.setValueAtTime(0.0, this.ctx.currentTime);
+      // Default live mic monitoring gain to 0.7 (audible) with safety compressor limiter
+      this.micGainNode.gain.value = 0.7;
+      this.micGainNode.gain.setValueAtTime(0.7, this.ctx.currentTime);
       this.aiGainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
 
       // Phase 4: Instantiate 3-Band Neural Mastering Chain
@@ -136,6 +132,10 @@ export class AudioEngine {
       this.aiGainNode.connect(this.masteringChain.getInputNode());
       this.masteringChain.getOutputNode().connect(this.masterGainNode);
       this.masterGainNode.connect(this.ctx.destination);
+
+      // 2. Initialize Stage 1 Stem Engine routing through Mastering Chain
+      this.stemEngine = new StemEngine(this.ctx, this.masteringChain.getInputNode());
+      await this.loadStems(stemSource);
 
       // Initialize Stage 2 AIAudioReceiver WebAudio AudioWorklet
       const aiWorklet = await this.aiAudioReceiver.initializeAudioWorklet(this.ctx);
@@ -569,6 +569,16 @@ export class AudioEngine {
 
   public getMasteringChain(): MasteringChain | null {
     return this.masteringChain;
+  }
+
+  public getStemEngine(): StemEngine | null {
+    return this.stemEngine;
+  }
+
+  public setBpm(bpm: number): void {
+    if (this.stemEngine) {
+      this.stemEngine.setBpm(bpm);
+    }
   }
 
   public getChordTracker(): ChordProgressionTracker {

@@ -2,6 +2,9 @@
 
 import React, { useState } from 'react';
 import { AudioEngine } from '@/lib/audio/AudioEngine';
+import { SessionsScreen } from './SessionsScreen';
+import { PerformLiveScreen } from './PerformLiveScreen';
+import { AssetsLibraryScreen } from './AssetsLibraryScreen';
 
 interface StudioHubRefinedScreenProps {
   audioEngine: AudioEngine | null;
@@ -28,11 +31,11 @@ export function StudioHubRefinedScreen({
         {/* Header Logo */}
         <div className="px-6 mb-8">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-8 h-8 rounded-full bg-[#d4af37] flex items-center justify-center shrink-0 text-[#3c2f00] shadow-[0_0_12px_rgba(212,175,55,0.4)]">
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2v20M17 5v14M7 8v8M2 11v2M22 11v2" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </div>
+            <img
+              src="/pulsejam_app_logo.jpg"
+              alt="PulseJam AI Logo"
+              className="w-8 h-8 rounded-lg border border-[#f2ca50]/40 shadow-[0_0_12px_rgba(242,202,80,0.3)] object-cover shrink-0"
+            />
             <div>
               <h1 className="font-serif text-2xl text-[#f2ca50] tracking-tight leading-none font-bold">
                 Pulsejam
@@ -91,7 +94,7 @@ export function StudioHubRefinedScreen({
             }`}
           >
             <svg className="w-4 h-4 text-current" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2v20M17 5v14M7 8v8M2 11v2M22 11v2" />
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
             <span>Perform</span>
           </button>
@@ -149,52 +152,65 @@ export function StudioHubRefinedScreen({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative z-0">
-        {/* Top App Bar */}
-        <header className="flex justify-between items-center px-8 h-16 w-full bg-[#121414] border-b border-[#4d4635]/40 z-20 shrink-0">
-          <div className="md:hidden flex items-center gap-2">
-            <h1 className="font-serif text-xl text-[#f2ca50] font-bold">Pulsejam</h1>
-          </div>
-          <div className="hidden md:block" />
-
-          {/* Top Actions: Notifications, Settings, Profile */}
-          <div className="flex items-center gap-4">
-            <button
-              className="text-[#d0c5af] hover:text-[#f2ca50] transition-colors p-2 rounded-full hover:bg-[#343535] cursor-pointer"
-              title="Notifications"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-            </button>
-
-            <button
-              onClick={onOpenSettings}
-              className="text-[#d0c5af] hover:text-[#f2ca50] transition-colors p-2 rounded-full hover:bg-[#343535] cursor-pointer"
-              title="Studio Settings & Mic Check"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-
-            {/* Profile Avatar */}
-            <div className="w-9 h-9 rounded-full bg-[#343535] border border-[#4d4635] overflow-hidden cursor-pointer ml-2">
-              <div className="w-full h-full bg-[#292a2a] flex items-center justify-center text-[#f2ca50] font-bold text-xs font-mono">
-                PJ
+        {activeTab === 'sessions' ? (
+          <SessionsScreen audioEngine={audioEngine} onLaunchStudio={onLaunchLiveSession} />
+        ) : activeTab === 'perform' ? (
+          <PerformLiveScreen audioEngine={audioEngine} onExitStage={() => setActiveTab('studio')} />
+        ) : activeTab === 'assets' ? (
+          <AssetsLibraryScreen audioEngine={audioEngine} onLaunchStudio={onLaunchLiveSession} />
+        ) : (
+          <>
+            {/* Top App Bar */}
+            <header className="flex justify-between items-center px-8 h-16 w-full bg-[#121414] border-b border-[#4d4635]/40 z-20 shrink-0">
+              <div className="md:hidden flex items-center gap-2">
+                <img
+                  src="/pulsejam_app_logo.jpg"
+                  alt="PulseJam AI Logo"
+                  className="w-7 h-7 rounded-lg border border-[#f2ca50]/40 object-cover"
+                />
+                <h1 className="font-serif text-xl text-[#f2ca50] font-bold">Pulsejam</h1>
               </div>
-            </div>
-          </div>
-        </header>
+              <div className="hidden md:block" />
 
-        {/* Scrollable Canvas Content */}
-        <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-          <div className="max-w-6xl mx-auto space-y-8 pb-16">
-            {/* Hero Section */}
-            <section className="relative bg-[#0a0a0a] border border-[#4d4635]/50 rounded-3xl p-8 overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#343535]/20 to-transparent pointer-events-none" />
-              <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+              {/* Top Actions: Notifications, Settings, Profile */}
+              <div className="flex items-center gap-4">
+                <button
+                  className="text-[#d0c5af] hover:text-[#f2ca50] transition-colors p-2 rounded-full hover:bg-[#343535] cursor-pointer"
+                  title="Notifications"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={onOpenSettings}
+                  className="text-[#d0c5af] hover:text-[#f2ca50] transition-colors p-2 rounded-full hover:bg-[#343535] cursor-pointer"
+                  title="Studio Settings & Mic Check"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </button>
+
+                {/* Profile Avatar */}
+                <div className="w-9 h-9 rounded-full bg-[#343535] border border-[#4d4635] overflow-hidden cursor-pointer ml-2">
+                  <div className="w-full h-full bg-[#292a2a] flex items-center justify-center text-[#f2ca50] font-bold text-xs font-mono">
+                    PJ
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {/* Scrollable Canvas Content */}
+            <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="max-w-6xl mx-auto space-y-8 pb-16">
+                {/* Hero Section */}
+                <section className="relative bg-[#0a0a0a] border border-[#4d4635]/50 rounded-3xl p-8 overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#343535]/20 to-transparent pointer-events-none" />
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                   <h2 className="font-serif text-3xl md:text-4xl text-[#e3e2e2] font-semibold">
                     Welcome back, <span className="text-[#f2ca50]">Maestro</span>
@@ -322,10 +338,8 @@ export function StudioHubRefinedScreen({
                   className="flex items-center justify-between p-4 rounded-xl hover:bg-[#292a2a] transition-colors cursor-pointer group"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-[#1a1c1c] border border-[#4d4635]/50 flex items-center justify-center shadow-md">
-                      <svg className="w-5 h-5 text-[#f2ca50]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 2v20M17 5v14M7 8v8M2 11v2M22 11v2" />
-                      </svg>
+                    <div className="w-10 h-10 rounded-lg bg-[#1a1c1c] border border-[#4d4635]/50 flex items-center justify-center shadow-md text-amber-400 font-bold">
+                      🎸
                     </div>
                     <div>
                       <h4 className="font-sans text-sm text-[#e3e2e2] font-medium group-hover:text-[#f2ca50] transition-colors">
@@ -387,7 +401,9 @@ export function StudioHubRefinedScreen({
             </section>
           </div>
         </main>
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Floating Bottom-Right Settings FAB Button */}
       <button

@@ -24,13 +24,24 @@ export class StemEngine {
   private currentActiveTier: PerformanceTier = 'chill';
   private isPlaying = false;
   private startTime = 0;
-  private loopDurationSeconds = 8.0; // 4 bars at 120 BPM
+  private loopDurationSeconds = 8.0;
+  private currentBpm = 120;
 
-  constructor(ctx: AudioContext) {
+  constructor(ctx: AudioContext, destinationNode?: AudioNode) {
     this.ctx = ctx;
     this.masterGainNode = this.ctx.createGain();
     this.masterGainNode.gain.value = 0.85;
-    this.masterGainNode.connect(this.ctx.destination);
+    if (destinationNode) {
+      this.masterGainNode.connect(destinationNode);
+    } else {
+      this.masterGainNode.connect(this.ctx.destination);
+    }
+  }
+
+  public setBpm(bpm: number) {
+    if (bpm >= 40 && bpm <= 240) {
+      this.currentBpm = bpm;
+    }
   }
 
   public initStems(stems: StemBuffers) {
@@ -112,8 +123,8 @@ export class StemEngine {
     const now = this.ctx.currentTime;
     const fadeDurationSec = CROSSFADE_DURATION_MS / 1000;
 
-    // Calculate nearest quarter-note bar alignment (120 BPM -> 0.5s quarter note)
-    const quarterNoteDurationSec = 0.5;
+    // Calculate nearest quarter-note bar alignment based on current tempo
+    const quarterNoteDurationSec = 60 / Math.max(40, Math.min(240, this.currentBpm));
     const elapsedSinceStart = now - this.startTime;
     const nextBeatTime = this.startTime + Math.ceil(elapsedSinceStart / quarterNoteDurationSec) * quarterNoteDurationSec;
 

@@ -14,6 +14,7 @@ import {
   SidecarStatus,
 } from './types';
 import { AIAudioReceiver } from './AIAudioReceiver';
+import { LocalGenerativeCompanion } from './LocalGenerativeCompanion';
 
 
 export interface ConditioningBridgeOptions {
@@ -72,7 +73,7 @@ export class ConditioningBridge {
   private maxReconnectDelayMs = 30000;
   private aiAudioReceiver: AIAudioReceiver | null = null;
   private receivedAudioSeq = 0;
-
+  private localCompanion: LocalGenerativeCompanion;
 
   // Timer & Subscribers
   private tickTimer: ReturnType<typeof setInterval> | null = null;
@@ -86,6 +87,7 @@ export class ConditioningBridge {
     this.tickIntervalMs = options.tickIntervalMs || 40;
     this.debugMode = options.debugMode ?? true;
     this.tierPromptMap = options.tierPromptMap || DEFAULT_TIER_PROMPTS;
+    this.localCompanion = new LocalGenerativeCompanion();
 
     this.confidenceWindowSize = options.confidenceWindowSize || 10;
     this.confidenceDropThreshold = options.confidenceDropThreshold || 0.35;
@@ -101,6 +103,7 @@ export class ConditioningBridge {
 
   public start() {
     if (this.tickTimer) return;
+    this.localCompanion.start();
     this.tickTimer = setInterval(() => this.onTick(), this.tickIntervalMs);
   }
 
@@ -109,6 +112,7 @@ export class ConditioningBridge {
       clearInterval(this.tickTimer);
       this.tickTimer = null;
     }
+    this.localCompanion.stop();
     this.disconnect();
   }
 
@@ -125,6 +129,7 @@ export class ConditioningBridge {
 
   public attachAIAudioReceiver(receiver: AIAudioReceiver | null) {
     this.aiAudioReceiver = receiver;
+    this.localCompanion.attachReceiver(receiver);
   }
 
   public setAIAudioReceiver(receiver: AIAudioReceiver | null) {
@@ -133,6 +138,10 @@ export class ConditioningBridge {
 
   public getAIAudioReceiver(): AIAudioReceiver | null {
     return this.aiAudioReceiver;
+  }
+
+  public getLocalCompanion(): LocalGenerativeCompanion {
+    return this.localCompanion;
   }
 
   public updateMetrics(metrics: DSPMetrics) {
@@ -214,8 +223,9 @@ export class ConditioningBridge {
       estimatedBpm,
     };
 
-    // 6. Forward Frame to Subscribers & Sidecar WebSocket
+    // 6. Forward Frame to Subscribers, Local Companion & Sidecar WebSocket
     this.notifyFrame(frame);
+    this.localCompanion.updateConditioning(frame);
 
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       try {
@@ -282,6 +292,7 @@ export class ConditioningBridge {
       this.socket.binaryType = 'arraybuffer';
 
       this.socket.onopen = () => {
+        this.localCompanion.stop();
         this.reconnectDelayMs = 2000;
         this.pingTimestamp = Date.now();
         this.socket?.send(
@@ -351,16 +362,18 @@ export class ConditioningBridge {
         }
       };
 
-
       this.socket.onerror = () => {
+        this.localCompanion.start();
         this.setStatus({ state: 'unavailable' });
       };
 
       this.socket.onclose = () => {
+        this.localCompanion.start();
         this.setStatus({ state: 'unavailable' });
         this.scheduleReconnect();
       };
     } catch {
+      this.localCompanion.start();
       this.setStatus({ state: 'unavailable' });
       this.scheduleReconnect();
     }

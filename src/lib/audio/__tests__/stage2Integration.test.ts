@@ -144,8 +144,8 @@ describe('Stage 2 Integration Test Suite', () => {
 
 
 
-    // Default gains (micMixGain defaults to 0.0 to prevent feedback)
-    expect(engine.getMicMixGain()).toBe(0.0);
+    // Default gains (micMixGain defaults to 0.7 for audible live monitoring with limiter)
+    expect(engine.getMicMixGain()).toBe(0.7);
     expect(engine.getAIAudioMixGain()).toBe(1.0);
     expect(engine.getMasterGain()).toBe(1.0);
 
