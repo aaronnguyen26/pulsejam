@@ -32,26 +32,38 @@ The system is engineered as a zero-latency single codebase that targets both hig
                      │  - RMS dB Volume Calculation & Peak Detection          │
                      │  - YIN Monophonic Pitch Detection (Hz -> MIDI)         │
                      │  - Attack Density & Hysteresis Dwell Engine            │
+                     │  - 12-Bin Chroma Profiler & TempoTracker (IOI BPM)     │
                      └──────────┬────────────────────┬────────────────────┬───┘
                                 │ Telemetry          │ MIDI Notes         │ Metrics
                                 ▼                    ▼                    ▼
+                     ┌────────────────────────────────────────────────────────┐
+                     │        ConditioningBridge (40ms Conditioning Frames)   │
+                     └──────────┬─────────────────────────────────────────┬───┘
+                                │ (Auto-Fallback / Local)                 │ (WebSocket ws://localhost:9090)
+                                ▼                                         ▼
 ┌─────────────────────────────────┐   ┌───────────────────────────┐   ┌─────────────────────────────────┐
-│     Stage 1: Stems Engine       │   │ Stage 2: Local AI Worker  │   │   Stage 3: Cloud Vibe Layer   │
-│  - Chill Stem (-∞ to -24dB)     │   │  - Magenta.js (TF.js WASM)│   │  - Google Lyria RealTime API    │
-│  - Groove Stem (-24 to -12dB)   │   │  - DrumsRNN & MelodyRNN   │   │  - 9-Min Session Auto-Rotate    │
-│  - Peak Stem (-12 to 0dB)       │   │  - Local MIDI Synth Engine│   │  - Telemetry-to-Prompt Mapping  │
+│     Stage 1: Stems Engine       │   │ LocalGenerativeCompanion  │   │     Native MLX Sidecar          │
+│  - Equal-Power Crossfading      │   │  - In-Browser Synthesis   │   │  - Apple Silicon GPU (MRT2)     │
+│  - Dynamic BPM Alignment        │   │  - 0x504A Binary PCM      │   │  - 0x504A Binary PCM Stream     │
 └────────────────┬────────────────┘   └─────────────┬─────────────┘   └────────────────┬────────────────┘
-                 │ Audio                            │ Audio                            │ Audio
-                 └────────────────────────┬─────────┴──────────────────────────────────┘
+                 │ Audio                            │ Audio (0x504A)                   │ Audio (0x504A)
+                 │                                  └─────────────┬────────────────────┘
+                 │                                                ▼
+                 │                                    ┌───────────────────────────┐
+                 │                                    │      AIAudioReceiver      │
+                 │                                    │  Jitter Buffer + Conceal  │
+                 │                                    └───────────┬───────────────┘
+                 │ Audio (Stems)                                  │ Audio (AI Stream)
+                 └────────────────────────┬───────────────────────┘
                                           ▼
                      ┌────────────────────────────────────────────────────────┐
-                     │                 Master Studio Output                   │
+                     │       3-Band Neural Mastering Chain & Master Bus       │
+                     │  - Tube Warmth, Stereo Widener, Reverb, Ceiling Limiter│
                      └───────────────────────────┬────────────────────────────┘
-                                                 │
+                                                 │ Master Audio
                                                  ▼
                      ┌────────────────────────────────────────────────────────┐
-                     │             Stage 3: Tauri Native macOS App            │
-                     │     Unsigned .dmg / Hardware Microphone / CSP          │
+                     │      Master Studio Output & OPFS Multi-Take WAV Export │
                      └────────────────────────────────────────────────────────┘
 ```
 

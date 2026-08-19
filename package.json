@@ -11,9 +11,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "next build && tauri build",
-    "sidecar": "PYTHONUNBUFFERED=1 experiments/mrt2-sanity-check/venv/bin/python scripts/sidecar/sidecar_server.py"
-
-
+    "sidecar": "node scripts/sidecar/server.mjs",
+    "sidecar:node": "node scripts/sidecar/server.mjs",
+    "sidecar:python": "python scripts/sidecar/server.py"
   },
   "dependencies": {
     "@tauri-apps/api": "2.0.0",
