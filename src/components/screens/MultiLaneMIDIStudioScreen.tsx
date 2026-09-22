@@ -1098,12 +1098,14 @@ export function MultiLaneMIDIStudioScreen({
             </div>
           </div>
 
-          {/* Stage 2 MRT2 Real-Time Stream Monitor Component */}
-          <AIGenerationMonitor
-            sidecarStatus={sidecarStatusState}
-            aiStreamMetrics={aiStreamMetrics}
-            onResetReceiver={() => audioEngine?.getAIAudioReceiver().reset()}
-          />
+          {/* AI Audio Stream Engine Precision Telemetry Ribbon */}
+          <div className="mt-2 shrink-0">
+            <AIGenerationMonitor
+              sidecarStatus={sidecarStatusState}
+              aiStreamMetrics={aiStreamMetrics}
+              onResetReceiver={() => audioEngine?.getAIAudioReceiver().reset()}
+            />
+          </div>
         </main>
 
         {/* Right-Hand Harmonic HUD & Neural Mastering Inspector Dock */}
