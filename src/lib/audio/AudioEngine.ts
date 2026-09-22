@@ -579,6 +579,9 @@ export class AudioEngine {
     if (this.stemEngine) {
       this.stemEngine.setBpm(bpm);
     }
+    if (this.conditioningBridge) {
+      this.conditioningBridge.getLocalCompanion().setBpm(bpm);
+    }
   }
 
   public getChordTracker(): ChordProgressionTracker {

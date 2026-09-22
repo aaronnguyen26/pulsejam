@@ -117,7 +117,7 @@ cd pulsejam
 # 2. Install Node.js dependencies
 npm install
 
-# 3. Verify test suite passes (46 unit & integration tests)
+# 3. Verify test suite passes (162 unit & integration tests)
 npm test
 ```
 

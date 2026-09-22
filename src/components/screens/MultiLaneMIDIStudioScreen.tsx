@@ -156,6 +156,7 @@ export function MultiLaneMIDIStudioScreen({
   const animFrameIdRef = useRef<number | null>(null);
   const scrubTimeRef = useRef<number>(0);
   const isDraggingPlayheadRef = useRef<boolean>(false);
+  const lastArrangerBeatTimeRef = useRef<number>(0);
 
   const PIXELS_PER_SECOND = 60;
 
@@ -386,14 +387,32 @@ export function MultiLaneMIDIStudioScreen({
         const chroma = chromaExtractorRef.current.getNormalizedChroma();
         const chord = audioEngine.getChordTracker().analyzeChroma(chroma, estimate.key);
         setChordEstimate(chord);
+
+        // ── FIX: Enrich metrics with chroma/key so ConditioningBridge passes them
+        //         to LocalGenerativeCompanion (without this the companion never
+        //         sees the user's actual key or chroma — it always uses defaults)
+        metrics.chromaVector = chroma;
+        metrics.estimatedKey = estimate.key;
       }
 
       // Acoustic onset tracking for tempo & dynamic arranger advance
       if (metrics.rawOnsetDensity > 0 && tempoTrackerRef.current) {
         tempoTrackerRef.current.registerOnset(Date.now());
-        const energy = Math.min(1.0, Math.max(0.1, (metrics.rawRmsDb + 60) / 40));
-        const arr = audioEngine.getDynamicArranger().advanceBeat(Date.now(), energy);
-        setArrangerState(arr);
+        const now = Date.now();
+        const minBeatIntervalMs = (60 / Math.max(40, currentBpm)) * 1000 * 0.75;
+        if (!lastArrangerBeatTimeRef.current || now - lastArrangerBeatTimeRef.current >= minBeatIntervalMs) {
+          lastArrangerBeatTimeRef.current = now;
+          const energy = Math.min(1.0, Math.max(0.1, (metrics.rawRmsDb + 60) / 40));
+          const arr = audioEngine.getDynamicArranger().advanceBeat(now, energy);
+          setArrangerState(arr);
+        }
+
+        // ── FIX: Backfeed detected BPM so ConditioningBridge relays it to
+        //         LocalGenerativeCompanion (otherwise drum rhythm is always 92 BPM)
+        const detectedBpm = tempoTrackerRef.current.getBpm();
+        if (detectedBpm > 0) {
+          metrics.detectedBpm = detectedBpm;
+        }
       }
 
       const amp = metrics.peakAmplitude ?? Math.min(1.0, Math.max(0.05, (metrics.rawRmsDb + 60) / 60));
@@ -402,6 +421,7 @@ export function MultiLaneMIDIStudioScreen({
         liveWaveformBufferRef.current.shift();
       }
     });
+
 
     const unsubAIAudio = audioEngine.subscribeAIAudioMetrics((m) => {
       setAiStreamMetrics(m);

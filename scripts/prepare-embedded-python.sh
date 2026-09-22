@@ -22,6 +22,15 @@ STAGING_DIR="$PROJECT_ROOT/build/staging"
 PYTHON_STAGING="$STAGING_DIR/python"
 RESOURCES_DIR="$PROJECT_ROOT/src-tauri/resources"
 
+# If python-runtime is already staged and ready in src-tauri/resources, refresh sidecar script and exit 0
+if [ -f "$RESOURCES_DIR/python-runtime/bin/python3" ]; then
+    echo "=== [SKIP] python-runtime already staged at $RESOURCES_DIR/python-runtime ==="
+    mkdir -p "$RESOURCES_DIR/scripts/sidecar"
+    cp "$PROJECT_ROOT/scripts/sidecar/sidecar_server.py" "$RESOURCES_DIR/scripts/sidecar/sidecar_server.py"
+    echo "=== Standalone Python Runtime verified in $RESOURCES_DIR/python-runtime ==="
+    exit 0
+fi
+
 echo "=== [1/4] Preparing Staging Directory ==="
 mkdir -p "$STAGING_DIR"
 

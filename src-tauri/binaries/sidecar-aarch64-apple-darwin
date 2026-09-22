@@ -43,6 +43,7 @@ BUNDLE_PYTHON_2="$RESOURCES_DIR/python-runtime/bin/python3"
 BUNDLE_SIDECAR_2="$RESOURCES_DIR/scripts/sidecar/sidecar_server.py"
 
 # Dev fallbacks
+DEV_EMBEDDED_PYTHON="$PROJECT_ROOT/src-tauri/resources/python-runtime/bin/python3"
 if [ -n "$PULSEJAM_ROOT" ]; then
     DEV_PYTHON="$PULSEJAM_ROOT/experiments/mrt2-sanity-check/venv/bin/python"
     DEV_SIDECAR="$PULSEJAM_ROOT/scripts/sidecar/sidecar_server.py"
@@ -64,12 +65,17 @@ elif [ -f "$DEV_PYTHON" ] && [ -f "$DEV_SIDECAR" ]; then
     PYTHON_BIN="$DEV_PYTHON"
     SIDECAR_SCRIPT="$DEV_SIDECAR"
     MODE="dev fallback venv"
+elif [ -f "$DEV_EMBEDDED_PYTHON" ] && [ -f "$DEV_SIDECAR" ]; then
+    PYTHON_BIN="$DEV_EMBEDDED_PYTHON"
+    SIDECAR_SCRIPT="$DEV_SIDECAR"
+    MODE="dev fallback embedded runtime"
 else
     echo "[sidecar-wrapper] ERROR: Could not locate Python runtime or sidecar_server.py script." >&2
     echo "[sidecar-wrapper] IS_APP_BUNDLE=$IS_APP_BUNDLE" >&2
     echo "[sidecar-wrapper] Tried BUNDLE_PYTHON_1=$BUNDLE_PYTHON_1" >&2
     echo "[sidecar-wrapper] Tried BUNDLE_PYTHON_2=$BUNDLE_PYTHON_2" >&2
     echo "[sidecar-wrapper] Tried DEV_PYTHON=$DEV_PYTHON" >&2
+    echo "[sidecar-wrapper] Tried DEV_EMBEDDED_PYTHON=$DEV_EMBEDDED_PYTHON" >&2
     exit 1
 fi
 

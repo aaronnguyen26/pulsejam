@@ -94,6 +94,16 @@ export class LocalGenerativeCompanion {
     }
   }
 
+  public setBpm(bpm: number): void {
+    if (bpm >= 40 && bpm <= 240) {
+      this.currentBpm = bpm;
+    }
+  }
+
+  public getBpm(): number {
+    return this.currentBpm;
+  }
+
   public updateConditioning(frame: ConditioningFrame): void {
     if (frame.estimatedBpm && frame.estimatedBpm >= 40 && frame.estimatedBpm <= 240) {
       this.currentBpm = frame.estimatedBpm;
@@ -102,6 +112,11 @@ export class LocalGenerativeCompanion {
     if (frame.estimatedKey) {
       this.currentKey = frame.estimatedKey;
       this.updateHarmonicPads(frame.estimatedKey);
+    } else if (frame.chromaVector && frame.chromaVector.length === 12) {
+      // ── FIX: No key estimate yet — derive pad tones directly from chroma energy peaks.
+      //         This ensures the companion plays something harmonically relevant from the
+      //         first note, rather than being stuck on the hardcoded A Minor default.
+      this.updatePadsFromChroma(frame.chromaVector);
     }
 
     // Inspect 128-element pitch state for onsets (2) or active pitches
@@ -121,6 +136,12 @@ export class LocalGenerativeCompanion {
         this.lastPitch = activePitch;
         this.noteOnTime = Date.now();
         this.triggerHarmonicResponse(activePitch);
+
+        // ── FIX: When no estimatedKey is in the frame, update the pads to match
+        //         the played pitch so the accompaniment tracks the user in real time.
+        if (!frame.estimatedKey) {
+          this.updateHarmonicPadsFromPitch(activePitch);
+        }
       }
     }
 
@@ -135,6 +156,7 @@ export class LocalGenerativeCompanion {
       }
     }
   }
+
 
   private triggerHarmonicResponse(midiPitch: number): void {
     // Convert MIDI pitch to Hz
@@ -164,6 +186,44 @@ export class LocalGenerativeCompanion {
     const rootMidi = noteToMidi[rootName] ?? 57;
     const thirdMidi = rootMidi + (isMinor ? 3 : 4);
     const fifthMidi = rootMidi + 7;
+
+    this.voice.padFreqs = [
+      440 * Math.pow(2, (rootMidi - 69) / 12),
+      440 * Math.pow(2, (thirdMidi - 69) / 12),
+      440 * Math.pow(2, (fifthMidi - 69) / 12),
+    ];
+  }
+
+  /**
+   * ── FIX: Derive pad tones directly from chroma energy when no key estimate is
+   * available. Picks the 3 most energetic pitch classes and voices them as a chord
+   * in the mid-octave range so the companion tracks the user from the first note.
+   */
+  private updatePadsFromChroma(chroma: number[]): void {
+    // Rank pitch classes by energy, take top 3
+    const ranked = chroma
+      .map((energy, pc) => ({ pc, energy }))
+      .sort((a, b) => b.energy - a.energy)
+      .slice(0, 3)
+      .sort((a, b) => a.pc - b.pc); // sort ascending for natural voicing
+
+    // Voice in octave 3–4 range (MIDI 48–71)
+    this.voice.padFreqs = ranked.map(({ pc }) => {
+      const midi = pc + 60; // place in octave 4
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    });
+  }
+
+  /**
+   * ── FIX: When pitch onset fires but no key estimate exists, build a simple
+   * contextual triad (root, minor third, fifth) from the played MIDI pitch.
+   * Uses a natural minor triad by default since minor tonalities are more
+   * universally consonant as an ambient backing.
+   */
+  private updateHarmonicPadsFromPitch(midiPitch: number): void {
+    const rootMidi = midiPitch;
+    const thirdMidi = rootMidi + 3; // default minor third
+    const fifthMidi = rootMidi + 7; // perfect fifth
 
     this.voice.padFreqs = [
       440 * Math.pow(2, (rootMidi - 69) / 12),

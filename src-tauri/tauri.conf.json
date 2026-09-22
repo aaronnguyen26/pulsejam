@@ -5,7 +5,7 @@
   "identifier": "com.pulsejam.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "bash scripts/prepare-embedded-python.sh && npm run build",
+    "beforeBuildCommand": "bash scripts/prepare-embedded-python.sh && npm run build && rm -rf out/downloads",
     "devUrl": "http://localhost:3000/studio",
     "frontendDist": "../out"
   },

@@ -7,14 +7,13 @@ import {
   CalibrationData,
 } from '@/lib/audio/types';
 
-import { ImmersiveWelcomeHomeScreen } from '@/components/screens/ImmersiveWelcomeHomeScreen';
 import { StudioHubRefinedScreen } from '@/components/screens/StudioHubRefinedScreen';
 import { MultiLaneMIDIStudioScreen } from '@/components/screens/MultiLaneMIDIStudioScreen';
 import { RefinedCalibrationModal } from '@/components/RefinedCalibrationModal';
 import { StudioSettingsModal } from '@/components/StudioSettingsModal';
 import { ConditioningBridge } from '@/lib/audio/ConditioningBridge';
 
-export type Stage1SubView = 'welcome' | 'studio-hub' | 'midi-studio';
+export type Stage1SubView = 'studio-hub' | 'midi-studio';
 
 export default function StudioHomePage() {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -76,19 +75,8 @@ export default function StudioHomePage() {
 
   return (
     <div className="relative min-h-screen bg-[#121414] text-[#e3e2e2]">
-      {/* Floating Mode Switcher Header: Welcome, Studio Hub, MIDI Studio */}
+      {/* Floating Mode Switcher Header: Studio Hub, MIDI Studio */}
       <header className="fixed top-3 right-6 z-50 flex items-center gap-2 bg-[#1e2020]/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-[#4d4635]/40 shadow-lg">
-        <button
-          onClick={() => setSubView('welcome')}
-          className={`px-3 py-1 rounded-full font-mono text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer ${
-            subView === 'welcome'
-              ? 'bg-[#f2ca50] text-[#3c2f00] shadow-[0_0_10px_rgba(242,202,80,0.4)]'
-              : 'text-[#d0c5af] hover:text-[#f2ca50]'
-          }`}
-        >
-          Welcome
-        </button>
-
         <button
           onClick={() => setSubView('studio-hub')}
           className={`px-3 py-1 rounded-full font-mono text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer ${
@@ -112,16 +100,7 @@ export default function StudioHomePage() {
         </button>
       </header>
 
-      {/* ── Screen 1: Immersive Welcome Screen ────────────────────── */}
-      {subView === 'welcome' && (
-        <ImmersiveWelcomeHomeScreen
-          onStartSession={handleStartSession}
-          onOpenStudioHub={() => setSubView('studio-hub')}
-          onOpenCalibration={() => setIsCalibrating(true)}
-        />
-      )}
-
-      {/* ── Screen 2: Studio Hub Refined Screen ───────────────────── */}
+      {/* ── Screen 1: Studio Hub Refined Screen ───────────────────── */}
       {subView === 'studio-hub' && (
         <StudioHubRefinedScreen
           audioEngine={audioEngine}

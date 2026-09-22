@@ -10,7 +10,7 @@
     "test": "vitest run",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "next build && tauri build",
+    "tauri:build": "tauri build",
     "sidecar": "node scripts/sidecar/server.mjs",
     "sidecar:node": "node scripts/sidecar/server.mjs",
     "sidecar:python": "python scripts/sidecar/server.py"
