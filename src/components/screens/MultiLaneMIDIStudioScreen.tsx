@@ -761,7 +761,7 @@ export function MultiLaneMIDIStudioScreen({
           <div
             className={`px-2.5 py-1 rounded border font-bold flex items-center gap-1 shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)] ${
               sidecarStatusState.state === 'connected'
-                ? 'bg-blue-950/40 border-blue-500/40 text-[#7bd0ff]'
+                ? 'bg-[#1e2020] border-[#f2ca50]/50 text-[#f2ca50]'
                 : aiStreamMetrics?.state === 'streaming'
                 ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
                 : 'bg-[#1f1b13] border-[#4d4635]/40 text-[#d0c5af]/70'
@@ -917,7 +917,7 @@ export function MultiLaneMIDIStudioScreen({
                   onClick={() => handleSelectSection(sec)}
                   className={`py-2 px-1 rounded flex flex-col items-center justify-center transition-all cursor-pointer border ${
                     isActive
-                      ? 'bg-[#231f17] text-[#7bd0ff] border-[#7bd0ff]/50 shadow-[0_0_10px_rgba(123,208,255,0.25)]'
+                      ? 'bg-[#231f17] text-[#f2ca50] border-[#f2ca50]/60 shadow-[0_0_10px_rgba(242,202,80,0.25)] font-bold'
                       : 'bg-transparent text-[#d0c5af]/60 border-transparent hover:bg-[#1f1b13] hover:text-[#eae1d4]'
                   }`}
                   title={`Jump Arranger to ${sec.toUpperCase()}`}
@@ -961,7 +961,7 @@ export function MultiLaneMIDIStudioScreen({
                           🎤
                         </div>
                       ) : (
-                        <div className="w-6 h-6 rounded bg-cyan-950/50 border border-cyan-500/40 flex items-center justify-center text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.2)]">
+                        <div className="w-6 h-6 rounded bg-[#2d2a21] border border-[#d0c5af]/40 flex items-center justify-center text-[#ffe9b0] shadow-sm">
                           🧠
                         </div>
                       )}
@@ -1063,10 +1063,10 @@ export function MultiLaneMIDIStudioScreen({
                     </div>
                   ) : (
                     /* AI Companion MRT2 Continuous Waveform & Buffer Depth Meter */
-                    <div className="w-full h-20 bg-cyan-950/20 backdrop-blur-md rounded-lg border border-cyan-500/30 p-3 flex flex-col justify-between shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)]">
+                    <div className="w-full h-20 bg-[#1e2020] rounded-lg border border-[#4d4635]/40 p-3 flex flex-col justify-between shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)]">
                       <div className="flex justify-between items-center text-xs font-mono">
-                        <span className="text-cyan-300 font-bold flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                        <span className="text-[#f2ca50] font-bold flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#f2ca50] animate-pulse" />
                           MRT2 REAL-TIME COMPANION ({activePreset.name.toUpperCase()})
                         </span>
                         <span className="text-slate-400">
@@ -1084,7 +1084,7 @@ export function MultiLaneMIDIStudioScreen({
                               key={`bar-meter-${bIdx}`}
                               className={`flex-1 rounded-sm transition-all duration-150 ${
                                 isActive
-                                  ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)] h-5'
+                                  ? 'bg-[#f2ca50] shadow-[0_0_8px_rgba(242,202,80,0.5)] h-5'
                                   : 'bg-white/10 h-1.5'
                               }`}
                             />
@@ -1116,7 +1116,7 @@ export function MultiLaneMIDIStudioScreen({
               </span>
               <button
                 onClick={() => setIsCircleOfFifthsOpen(true)}
-                className="text-[10px] font-mono text-cyan-300 hover:underline cursor-pointer"
+                className="text-[10px] font-mono text-[#f2ca50] hover:underline cursor-pointer"
               >
                 WHEEL HUD ↗
               </button>
@@ -1135,19 +1135,19 @@ export function MultiLaneMIDIStudioScreen({
               </div>
               <div className="text-right">
                 <span className="text-[9px] font-mono text-[#d0c5af]/60 block uppercase">HARMONIC TENSION</span>
-                <span className="text-xs font-mono font-bold text-emerald-400">
+                <span className="text-xs font-mono font-bold text-[#f2ca50]">
                   {Math.round((chordEstimate?.harmonicTension || 0.2) * 100)}%
                 </span>
               </div>
             </div>
 
             {/* Neural Solo Scale Recommendation Card */}
-            <div className="mt-3 bg-cyan-950/20 border border-cyan-500/30 rounded-xl p-3.5 shadow-sm">
+            <div className="mt-3 bg-[#1e2020] border border-[#4d4635]/50 rounded-xl p-3.5 shadow-sm">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-mono font-bold text-cyan-300 uppercase">RECOMMENDED SOLO SCALE</span>
+                <span className="text-[10px] font-mono font-bold text-[#f2ca50] uppercase">RECOMMENDED SOLO SCALE</span>
                 <span className="text-[10px]">✨</span>
               </div>
-              <div className="text-sm font-bold text-white font-mono">
+              <div className="text-sm font-bold text-[#ffe9b0] font-mono">
                 {chordEstimate?.recommendedScales?.[0] || `${estimatedKey.split(' ')[0]} Dorian Mode`}
               </div>
               <p className="text-[10px] text-[#d0c5af]/70 font-mono mt-1 leading-relaxed">
@@ -1189,7 +1189,7 @@ export function MultiLaneMIDIStudioScreen({
               <div className="bg-[#1f1b13] border border-[#4d4635]/40 rounded-xl p-3 shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]">
                 <div className="flex justify-between items-center text-[10px] font-mono mb-1.5">
                   <span className="text-[#d0c5af]/80">STEREO WIDTH IMAGER</span>
-                  <span className="text-cyan-300 font-bold">{Math.round(masteringOptions.stereoWidth * 100)}%</span>
+                  <span className="text-[#f2ca50] font-bold">{Math.round(masteringOptions.stereoWidth * 100)}%</span>
                 </div>
                 <input
                   type="range"
@@ -1198,7 +1198,7 @@ export function MultiLaneMIDIStudioScreen({
                   step="0.05"
                   value={masteringOptions.stereoWidth}
                   onChange={(e) => handleUpdateMastering({ stereoWidth: parseFloat(e.target.value) })}
-                  className="w-full h-1 bg-black/60 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  className="w-full h-1 bg-black/60 rounded-lg appearance-none cursor-pointer accent-[#f2ca50]"
                 />
               </div>
 
@@ -1345,7 +1345,7 @@ export function MultiLaneMIDIStudioScreen({
               TIER: <strong className="text-amber-400 font-bold">{activeTierState.toUpperCase()}</strong>
             </span>
             <span className="text-slate-400">
-              CONF: <strong className="text-cyan-400 font-bold">{liveConfidenceState}%</strong>
+              CONF: <strong className="text-[#f2ca50] font-bold">{liveConfidenceState}%</strong>
             </span>
           </div>
         </div>
