@@ -91,4 +91,14 @@ describe('LocalGenerativeCompanion & Jam Fixes Test Suite', () => {
     // Verified no error thrown and engine holds active state
     expect(stemEngine.getActiveTier()).toBe('chill');
   });
+
+  it('guarantees complete silence (zero audio amplitude) when idle with no musician input', () => {
+    // Generate chunk before any notes or keys are received
+    const chunk = companion.generateAndPushChunk();
+    const floatData = new Float32Array(chunk, BINARY_HEADER_SIZE, 1920 * 2);
+
+    // Every sample must be 0.0 (no un-enveloped drone)
+    const maxAmplitude = floatData.reduce((max, s) => Math.max(max, Math.abs(s)), 0);
+    expect(maxAmplitude).toBe(0.0);
+  });
 });

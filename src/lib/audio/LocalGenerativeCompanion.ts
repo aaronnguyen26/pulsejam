@@ -57,7 +57,7 @@ export class LocalGenerativeCompanion {
     leadEnv: 0,
     padFreqs: [220, 261.63, 329.63], // Am triad (A3, C4, E4)
     padPhases: [0, 0, 0],
-    padEnv: 0.3,
+    padEnv: 0.0,
     drumStep: 0,
     drumSampleCounter: 0,
   };
@@ -171,6 +171,9 @@ export class LocalGenerativeCompanion {
     const leadMidi = midiPitch + 7; // fifth above
     this.voice.leadFreq = 440 * Math.pow(2, (leadMidi - 69) / 12);
     this.voice.leadEnv = 0.8;
+
+    // Trigger pad envelope
+    this.voice.padEnv = 1.0;
   }
 
   private updateHarmonicPads(key: string): void {
@@ -192,6 +195,8 @@ export class LocalGenerativeCompanion {
       440 * Math.pow(2, (thirdMidi - 69) / 12),
       440 * Math.pow(2, (fifthMidi - 69) / 12),
     ];
+    this.voice.padEnv = 1.0;
+    this.noteOnTime = Date.now();
   }
 
   /**
@@ -212,6 +217,8 @@ export class LocalGenerativeCompanion {
       const midi = pc + 60; // place in octave 4
       return 440 * Math.pow(2, (midi - 69) / 12);
     });
+    this.voice.padEnv = 1.0;
+    this.noteOnTime = Date.now();
   }
 
   /**
@@ -230,6 +237,8 @@ export class LocalGenerativeCompanion {
       440 * Math.pow(2, (thirdMidi - 69) / 12),
       440 * Math.pow(2, (fifthMidi - 69) / 12),
     ];
+    this.voice.padEnv = 1.0;
+    this.noteOnTime = Date.now();
   }
 
   /**
@@ -262,6 +271,8 @@ export class LocalGenerativeCompanion {
     const bassGain = tier === 'chill' ? 0.18 : tier === 'groove' ? 0.28 : 0.35;
     const drumGain = tier === 'chill' ? 0.0 : tier === 'groove' ? 0.25 : 0.38;
 
+    const isPlayerActive = this.noteOnTime > 0 && (now - this.noteOnTime) < 4000;
+
     for (let i = 0; i < N; i++) {
       this.voice.drumSampleCounter++;
       if (this.voice.drumSampleCounter >= samplesPer16th) {
@@ -269,32 +280,50 @@ export class LocalGenerativeCompanion {
         this.voice.drumStep = (this.voice.drumStep + 1) % 16;
       }
 
-      // --- Pad Synthesis (Warm Sine/Triangle Triad) ---
+      // --- Pad Synthesis (Warm Sine/Triangle Triad with dynamic envelope) ---
       let padSample = 0;
-      for (let p = 0; p < this.voice.padFreqs.length; p++) {
-        const f = this.voice.padFreqs[p];
-        this.voice.padPhases[p] = (this.voice.padPhases[p] + (2 * Math.PI * f) / this.sampleRate) % (2 * Math.PI);
-        padSample += Math.sin(this.voice.padPhases[p]) * (1 / this.voice.padFreqs.length);
+      if (this.voice.padEnv > 0.0001) {
+        for (let p = 0; p < this.voice.padFreqs.length; p++) {
+          const f = this.voice.padFreqs[p];
+          this.voice.padPhases[p] = (this.voice.padPhases[p] + (2 * Math.PI * f) / this.sampleRate) % (2 * Math.PI);
+          padSample += Math.sin(this.voice.padPhases[p]) * (1 / this.voice.padFreqs.length);
+        }
+        padSample *= (padGain * this.voice.padEnv);
+        this.voice.padEnv *= 0.99985;
+        if (this.voice.padEnv < 0.0001) {
+          this.voice.padEnv = 0;
+        }
       }
-      padSample *= padGain;
 
       // --- Bass Synthesis (Warm Sub + Harmonics) ---
-      this.voice.bassPhase = (this.voice.bassPhase + (2 * Math.PI * this.voice.bassFreq) / this.sampleRate) % (2 * Math.PI);
-      const bassWave = Math.sin(this.voice.bassPhase) + 0.3 * Math.sin(2 * this.voice.bassPhase);
-      const bassSample = bassWave * this.voice.bassEnv * bassGain;
-      this.voice.bassEnv *= 0.9997; // Smooth decay
+      let bassSample = 0;
+      if (this.voice.bassEnv > 0.0001) {
+        this.voice.bassPhase = (this.voice.bassPhase + (2 * Math.PI * this.voice.bassFreq) / this.sampleRate) % (2 * Math.PI);
+        const bassWave = Math.sin(this.voice.bassPhase) + 0.3 * Math.sin(2 * this.voice.bassPhase);
+        bassSample = bassWave * this.voice.bassEnv * bassGain;
+        this.voice.bassEnv *= 0.9997; // Smooth decay
+        if (this.voice.bassEnv < 0.0001) {
+          this.voice.bassEnv = 0;
+        }
+      }
 
       // --- Counter-Melody Lead Synthesis ---
-      this.voice.leadPhase = (this.voice.leadPhase + (2 * Math.PI * this.voice.leadFreq) / this.sampleRate) % (2 * Math.PI);
-      const leadWave = (Math.sin(this.voice.leadPhase) > 0 ? 0.5 : -0.5) * 0.5; // Soft pulse
-      const leadSample = leadWave * this.voice.leadEnv * 0.12;
-      this.voice.leadEnv *= 0.9995;
+      let leadSample = 0;
+      if (this.voice.leadEnv > 0.0001) {
+        this.voice.leadPhase = (this.voice.leadPhase + (2 * Math.PI * this.voice.leadFreq) / this.sampleRate) % (2 * Math.PI);
+        const leadWave = (Math.sin(this.voice.leadPhase) > 0 ? 0.5 : -0.5) * 0.5; // Soft pulse
+        leadSample = leadWave * this.voice.leadEnv * 0.12;
+        this.voice.leadEnv *= 0.9995;
+        if (this.voice.leadEnv < 0.0001) {
+          this.voice.leadEnv = 0;
+        }
+      }
 
       // --- Drum Pattern Synthesis (Kick, Snare, Hi-Hat) ---
       let drumSampleL = 0;
       let drumSampleR = 0;
 
-      if (drumGain > 0) {
+      if (drumGain > 0 && isPlayerActive) {
         const step = this.voice.drumStep;
         const subFrac = this.voice.drumSampleCounter / samplesPer16th;
 
