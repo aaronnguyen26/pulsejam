@@ -23,6 +23,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
  *    - Growth card uses authentic guitar fretboard image extracted from 'Pulsejam: Dynamic Security Experience'.
  *    - GSAP ScrollTrigger pinned horizontal scroll-jack with snap to 100% full view.
  */
+const MACOS_DMG_DOWNLOAD_URL = 'https://github.com/aaronnguyen26/pulsejam/releases/download/v0.1.0/PulseJam_0.1.0_aarch64.dmg';
+
 export const RefinedBrandExperienceScreen: React.FC = () => {
   const [downloadOpen, setDownloadOpen] = useState(false);
 
@@ -168,7 +170,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
                   </div>
                 </div>
                 <a
-                  href="/downloads/PulseJam_0.1.0_aarch64.dmg"
+                  href={MACOS_DMG_DOWNLOAD_URL}
                   download="PulseJam_0.1.0_aarch64.dmg"
                   className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 rounded-lg transition-colors group text-slate-100"
                 >
@@ -219,7 +221,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-4 md:pt-6 justify-center md:justify-start">
               <a
-                href="/downloads/PulseJam_0.1.0_aarch64.dmg"
+                href={MACOS_DMG_DOWNLOAD_URL}
                 download="PulseJam_0.1.0_aarch64.dmg"
                 className="bg-gradient-brass text-[#3c2f00] font-label-caps text-xs px-8 md:px-10 py-4 md:py-5 rounded-full highlight-top uppercase tracking-widest font-bold hover:brightness-110 transition-all inline-flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(242,202,80,0.25)] hover:shadow-[0_0_40px_rgba(242,202,80,0.4)] cursor-pointer"
               >
@@ -730,7 +732,7 @@ export const RefinedBrandExperienceScreen: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center pt-4">
               <a
-                href="/downloads/PulseJam_0.1.0_aarch64.dmg"
+                href={MACOS_DMG_DOWNLOAD_URL}
                 download="PulseJam_0.1.0_aarch64.dmg"
                 className="bg-gradient-brass text-[#3c2f00] font-label-caps text-xs px-8 py-4 rounded-full highlight-top uppercase tracking-widest font-bold hover:brightness-110 transition-all shadow-[0_0_30px_rgba(242,202,80,0.25)] flex items-center justify-center gap-3 cursor-pointer"
               >

@@ -161,6 +161,8 @@ npm run tauri:build
 
 The resulting installer will be located in `src-tauri/target/release/bundle/dmg/`.
 
+> **Pre-built DMG:** You can also download the latest macOS Apple Silicon installer directly from [GitHub Releases v0.1.0](https://github.com/aaronnguyen26/pulsejam/releases/latest/download/PulseJam_0.1.0_aarch64.dmg).
+
 ---
 
 ## 📁 Project Structure
