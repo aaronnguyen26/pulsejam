@@ -42,6 +42,7 @@ export class AIAudioReceiver {
   private underrunCount = 0;
   private currentState: AIAudioStreamState = 'idle';
   private isBinaryStream = false;
+  private idleTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
   // WebAudio Integration
   private ctx: AudioContext | null = null;
@@ -108,6 +109,11 @@ export class AIAudioReceiver {
     const now = timestamp ?? Date.now();
     this.lastChunkTimestamp = now;
 
+    if (this.idleTimeoutTimer) {
+      clearTimeout(this.idleTimeoutTimer);
+      this.idleTimeoutTimer = null;
+    }
+
     // If given ArrayBuffer, check if it contains the binary magic header
     if (pcmData instanceof ArrayBuffer && pcmData.byteLength >= BINARY_HEADER_SIZE) {
       const dv = new DataView(pcmData);
@@ -171,6 +177,7 @@ export class AIAudioReceiver {
       });
     }
 
+    this.scheduleIdleTransition();
     this.notifyMetrics();
   }
 
@@ -180,7 +187,7 @@ export class AIAudioReceiver {
    */
   public consumeChunk(): ParsedPCMChunk | null {
     if (this.chunkQueue.length === 0) {
-      if (this.currentState === 'streaming' || this.currentState === 'stalled') {
+      if (this.currentState === 'streaming') {
         this.currentState = 'stalled';
         this.underrunCount++;
         this.notifyMetrics();
@@ -189,11 +196,6 @@ export class AIAudioReceiver {
     }
 
     const chunk = this.chunkQueue.shift()!;
-
-    if (this.chunkQueue.length === 0 && this.currentState === 'streaming') {
-      this.currentState = 'stalled';
-    }
-
     this.notifyMetrics();
     return chunk;
   }
@@ -214,6 +216,10 @@ export class AIAudioReceiver {
    * Resets receiver state cleanly (for stream stops, restarts, or explicit resets).
    */
   public reset(): void {
+    if (this.idleTimeoutTimer) {
+      clearTimeout(this.idleTimeoutTimer);
+      this.idleTimeoutTimer = null;
+    }
     this.resetInternalBuffer();
     this.underrunCount = 0;
     this.currentState = 'idle';
@@ -230,6 +236,18 @@ export class AIAudioReceiver {
     }
   }
 
+  private scheduleIdleTransition(): void {
+    if (this.idleTimeoutTimer) {
+      clearTimeout(this.idleTimeoutTimer);
+    }
+    this.idleTimeoutTimer = setTimeout(() => {
+      if (this.currentState === 'stalled' || (this.currentState === 'streaming' && this.chunkQueue.length === 0)) {
+        this.currentState = 'idle';
+        this.notifyMetrics();
+      }
+    }, 600);
+  }
+
   /**
    * Initializes WebAudio AudioWorklet integration.
    */
@@ -243,7 +261,14 @@ export class AIAudioReceiver {
 
       this.workletNode.port.onmessage = (event) => {
         if (event.data?.type === 'WORKLET_UNDERRUN') {
-          if (this.currentState === 'streaming') {
+          const now = Date.now();
+          // If chunks have ceased for more than 500ms, stream has ended / is in standby
+          if (now - this.lastChunkTimestamp > 500) {
+            if (this.currentState !== 'idle') {
+              this.currentState = 'idle';
+              this.notifyMetrics();
+            }
+          } else if (this.currentState === 'streaming') {
             this.currentState = 'stalled';
             this.underrunCount++;
             this.notifyMetrics();

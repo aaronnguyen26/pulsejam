@@ -24,6 +24,11 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
     this.writeIndex = 0;
     this.availableSamples = 0;
 
+    // Target pre-buffer: 3 chunks * 1920 = 5760 samples (~120ms at 48kHz)
+    this.targetBufferSamples = Math.floor(currentSR * 0.12);
+    this.isBuffering = true;
+    this.hasReceivedAudio = false;
+
     // Concealment & Drift State
     this.lastLeftSample = 0.0;
     this.lastRightSample = 0.0;
@@ -42,6 +47,8 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
         const { left, right, samplesCount } = data.payload || {};
         if (!left || !samplesCount) return;
 
+        this.hasReceivedAudio = true;
+
         // Clock drift check: if buffer is over 60% full, gently compress chunk
         const highWatermark = Math.floor(this.bufferCapacity * 0.6);
         let count = Math.min(samplesCount, this.bufferCapacity - this.availableSamples);
@@ -59,6 +66,13 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
         }
         this.availableSamples += count;
 
+        // Exit buffering once pre-buffer threshold is met
+        if (this.isBuffering && this.availableSamples >= this.targetBufferSamples) {
+          this.isBuffering = false;
+          this.isRecoveringFromUnderrun = true;
+          this.fadeStep = 0;
+        }
+
         if (this.isRecoveringFromUnderrun) {
           this.fadeStep = 0;
         }
@@ -74,6 +88,8 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
         this.lastLeftSample = 0.0;
         this.lastRightSample = 0.0;
         this.isRecoveringFromUnderrun = false;
+        this.isBuffering = true;
+        this.hasReceivedAudio = false;
         break;
       }
     }
@@ -87,34 +103,11 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
     const outRight = output[1] || output[0];
     const frameCount = outLeft.length;
 
-    if (this.availableSamples >= frameCount) {
+    // If buffering initial audio or waiting for stream, output silence
+    if (this.isBuffering || this.availableSamples < frameCount) {
+      // Soft fade-out of any residual tail samples
       for (let i = 0; i < frameCount; i++) {
-        let l = this.bufferLeft[this.readIndex];
-        let r = this.bufferRight[this.readIndex];
-
-        // Soft fade-in recovery if recovering from underrun
-        if (this.isRecoveringFromUnderrun && this.fadeStep < this.fadeLength) {
-          const gain = this.fadeStep / this.fadeLength;
-          l *= gain;
-          r *= gain;
-          this.fadeStep++;
-          if (this.fadeStep >= this.fadeLength) {
-            this.isRecoveringFromUnderrun = false;
-          }
-        }
-
-        outLeft[i] = l;
-        outRight[i] = r;
-        this.lastLeftSample = l;
-        this.lastRightSample = r;
-
-        this.readIndex = (this.readIndex + 1) % this.bufferCapacity;
-      }
-      this.availableSamples -= frameCount;
-    } else {
-      // Underrun Concealment: Soft fade-out of remaining samples down to 0
-      for (let i = 0; i < frameCount; i++) {
-        if (this.availableSamples > 0) {
+        if (this.availableSamples > 0 && !this.isBuffering) {
           const l = this.bufferLeft[this.readIndex];
           const r = this.bufferRight[this.readIndex];
           outLeft[i] = l;
@@ -124,7 +117,6 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
           this.readIndex = (this.readIndex + 1) % this.bufferCapacity;
           this.availableSamples--;
         } else {
-          // Decay previous amplitude exponentially to avoid digital clicks
           this.lastLeftSample *= 0.85;
           this.lastRightSample *= 0.85;
           outLeft[i] = Math.abs(this.lastLeftSample) > 0.0001 ? this.lastLeftSample : 0;
@@ -132,12 +124,43 @@ class AIReceiverProcessor extends AudioWorkletProcessor {
         }
       }
 
-      this.isRecoveringFromUnderrun = true;
-      this.port.postMessage({
-        type: 'WORKLET_UNDERRUN',
-        payload: { availableSamples: this.availableSamples },
-      });
+      // If we were playing and just ran out of samples, notify receiver ONCE and re-enter buffering
+      if (this.hasReceivedAudio && !this.isBuffering) {
+        this.isBuffering = true;
+        this.isRecoveringFromUnderrun = true;
+        this.port.postMessage({
+          type: 'WORKLET_UNDERRUN',
+          payload: { availableSamples: this.availableSamples },
+        });
+      }
+
+      return true;
     }
+
+    // Normal playback with full jitter buffer
+    for (let i = 0; i < frameCount; i++) {
+      let l = this.bufferLeft[this.readIndex];
+      let r = this.bufferRight[this.readIndex];
+
+      // Soft fade-in recovery if recovering from underrun
+      if (this.isRecoveringFromUnderrun && this.fadeStep < this.fadeLength) {
+        const gain = this.fadeStep / this.fadeLength;
+        l *= gain;
+        r *= gain;
+        this.fadeStep++;
+        if (this.fadeStep >= this.fadeLength) {
+          this.isRecoveringFromUnderrun = false;
+        }
+      }
+
+      outLeft[i] = l;
+      outRight[i] = r;
+      this.lastLeftSample = l;
+      this.lastRightSample = r;
+
+      this.readIndex = (this.readIndex + 1) % this.bufferCapacity;
+    }
+    this.availableSamples -= frameCount;
 
     return true;
   }

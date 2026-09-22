@@ -176,4 +176,38 @@ describe('AIAudioReceiver Phase 1 Isolated Milestone', () => {
     expect(metrics.bufferDepthChunks).toBe(0);
     expect(metrics.underrunCount).toBe(0);
   });
+
+  it('Stability: idle queues do not generate spurious underruns or thrash state', async () => {
+    // 1. Initial idle state
+    expect(receiver.getMetrics().state).toBe('idle');
+    expect(receiver.consumeChunk()).toBeNull();
+    // Consuming while already idle must NOT trigger stalled or increment underruns
+    expect(receiver.getMetrics().state).toBe('idle');
+    expect(receiver.getMetrics().underrunCount).toBe(0);
+
+    // 2. Push 3 chunks -> transitions to streaming
+    receiver.pushChunk(createSyntheticChunk(0), 0);
+    receiver.pushChunk(createSyntheticChunk(1), 1);
+    receiver.pushChunk(createSyntheticChunk(2), 2);
+    expect(receiver.getMetrics().state).toBe('streaming');
+
+    // 3. Consume all 3 chunks
+    expect(receiver.consumeChunk()?.sequenceNumber).toBe(0);
+    expect(receiver.consumeChunk()?.sequenceNumber).toBe(1);
+    expect(receiver.consumeChunk()?.sequenceNumber).toBe(2);
+
+    // 4. Next consume on empty queue triggers stalled once
+    expect(receiver.consumeChunk()).toBeNull();
+    expect(receiver.getMetrics().state).toBe('stalled');
+    expect(receiver.getMetrics().underrunCount).toBe(1);
+
+    // Repeated consume while already stalled should not keep incrementing underruns
+    expect(receiver.consumeChunk()).toBeNull();
+    expect(receiver.getMetrics().underrunCount).toBe(1);
+
+    // 5. Explicit reset or timeout returns cleanly to idle
+    receiver.reset();
+    expect(receiver.getMetrics().state).toBe('idle');
+    expect(receiver.getMetrics().underrunCount).toBe(0);
+  });
 });

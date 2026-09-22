@@ -15,7 +15,6 @@ import {
   MasteringOptions,
 } from '@/lib/audio/types';
 import { AddTrackModal, TrackType } from '@/components/AddTrackModal';
-import { AIGenerationMonitor } from '@/components/AIGenerationMonitor';
 import { TempoTracker, CountInState } from '@/lib/audio/TempoTracker';
 import { ChromaFeatureExtractor } from '@/lib/audio/ChromaFeatureExtractor';
 import { STYLE_PRESETS, getStylePreset } from '@/lib/audio/StylePresets';
@@ -1096,15 +1095,6 @@ export function MultiLaneMIDIStudioScreen({
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* AI Audio Stream Engine Precision Telemetry Ribbon */}
-          <div className="mt-2 shrink-0">
-            <AIGenerationMonitor
-              sidecarStatus={sidecarStatusState}
-              aiStreamMetrics={aiStreamMetrics}
-              onResetReceiver={() => audioEngine?.getAIAudioReceiver().reset()}
-            />
           </div>
         </main>
 

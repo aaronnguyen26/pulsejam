@@ -52,11 +52,18 @@ export const AIGenerationMonitor: React.FC<AIGenerationMonitorProps> = ({
 
   // State indicator styling in obsidian & champagne gold theme
   const getLedDetails = () => {
-    if (sidecarState === 'connected' && streamState === 'streaming') {
+    if (streamState === 'streaming') {
       return {
-        color: 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)] animate-pulse',
+        color: 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]',
         badge: 'STREAMING',
         badgeClass: 'bg-emerald-950/60 text-emerald-400 border-emerald-500/40',
+      };
+    }
+    if (streamState === 'buffering') {
+      return {
+        color: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)] animate-pulse',
+        badge: 'BUFFERING',
+        badgeClass: 'bg-amber-950/60 text-amber-300 border-amber-500/40',
       };
     }
     if (sidecarState === 'connected') {
@@ -64,13 +71,6 @@ export const AIGenerationMonitor: React.FC<AIGenerationMonitorProps> = ({
         color: 'bg-[#f2ca50] shadow-[0_0_8px_rgba(242,202,80,0.5)]',
         badge: 'READY',
         badgeClass: 'bg-[#231f17] text-[#f2ca50] border-[#f2ca50]/30',
-      };
-    }
-    if (sidecarState === 'high-latency' || streamState === 'buffering') {
-      return {
-        color: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)] animate-pulse',
-        badge: 'BUFFERING',
-        badgeClass: 'bg-amber-950/60 text-amber-300 border-amber-500/40',
       };
     }
     if (streamState === 'stalled') {
@@ -167,19 +167,8 @@ export const AIGenerationMonitor: React.FC<AIGenerationMonitorProps> = ({
           </span>
         </div>
 
-        {/* Right: Actions & Diagnostics Toggle */}
+        {/* Right: Diagnostics Toggle */}
         <div className="flex items-center gap-2">
-          {onResetReceiver && (
-            <button
-              onClick={handleReset}
-              disabled={isResetting}
-              className="px-2 py-1 rounded text-[10px] font-mono text-[#d0c5af]/70 hover:text-[#f2ca50] hover:bg-white/5 border border-transparent hover:border-[#4d4635]/40 transition cursor-pointer"
-              title="Reset jitter buffer and resynchronize neural audio stream"
-            >
-              {isResetting ? 'RESETTING…' : 'RESET'}
-            </button>
-          )}
-
           <button
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={expanded}

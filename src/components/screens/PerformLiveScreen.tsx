@@ -15,34 +15,34 @@ export const PerformLiveScreen: React.FC<PerformLiveScreenProps> = ({
   onExitStage,
 }) => {
   const [selectedPresetId, setSelectedPresetId] = useState('neosoul');
-  const [currentTier, setCurrentTier] = useState<PerformanceTier>('groove');
+  const [currentTier, setCurrentTier] = useState<PerformanceTier>('chill');
   const [currentBpm, setCurrentBpm] = useState(92);
-  const [detectedKey, setDetectedKey] = useState('A Minor');
+  const [detectedKey, setDetectedKey] = useState('--');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isTakeSavedToast, setIsTakeSavedToast] = useState(false);
   const [activeScaleIndex, setActiveScaleIndex] = useState(0);
 
   const [chordEstimate, setChordEstimate] = useState<ChordEstimate>({
-    rootNoteName: 'A',
-    rootMidiPitch: 57,
+    rootNoteName: '--',
+    rootMidiPitch: 0,
     quality: 'Minor',
-    chordSymbol: 'Am7',
-    romanNumeral: 'i7',
-    confidence: 0.94,
-    harmonicTension: 0.25,
-    recommendedScales: ['A Dorian Mode', 'A Minor Pentatonic', 'A Blues Scale'],
+    chordSymbol: '--',
+    romanNumeral: '--',
+    confidence: 0,
+    harmonicTension: 0,
+    recommendedScales: ['Awaiting Live Input...'],
   });
 
   const [arrangerState, setArrangerState] = useState<ArrangerState>({
-    currentSection: 'chorus',
-    currentBar: 8,
-    currentBeat: 3,
-    totalBarsPlayed: 24,
+    currentSection: 'intro',
+    currentBar: 1,
+    currentBeat: 1,
+    totalBarsPlayed: 0,
     feel: 'standard',
     isFillQueued: false,
     isFillActive: false,
-    energyLevel: 0.85,
-    sectionProgress: 0.75,
+    energyLevel: 0.0,
+    sectionProgress: 0.0,
   });
 
   // Gig Timer
@@ -96,10 +96,11 @@ export const PerformLiveScreen: React.FC<PerformLiveScreenProps> = ({
   };
 
   const activePreset = getStylePreset(selectedPresetId);
-  const currentScaleName = chordEstimate.recommendedScales[activeScaleIndex] || chordEstimate.recommendedScales[0] || 'A Dorian Mode';
+  const currentScaleName = chordEstimate.recommendedScales[activeScaleIndex] || chordEstimate.recommendedScales[0] || 'Awaiting Live Input...';
 
-  // Scale degrees data for A Dorian (Root A)
-  const scaleDegrees = [
+  // Scale degrees data (empty when idle / awaiting input)
+  const isAwaitingInput = chordEstimate.chordSymbol === '--';
+  const scaleDegrees = isAwaitingInput ? [] : [
     { degree: '1 (Root)', note: chordEstimate.rootNoteName || 'A', isKey: true },
     { degree: '2', note: 'B', isKey: false },
     { degree: '♭3', note: 'C', isKey: false },
@@ -217,7 +218,11 @@ export const PerformLiveScreen: React.FC<PerformLiveScreenProps> = ({
                     </span>
                   </div>
                   <span className="font-mono text-[11px] text-[#d0c5af]/80 mt-1">
-                    Next: <strong className="text-[#ffe9b0]">Fmaj7 (#11)</strong> [VImaj7]
+                    {chordEstimate.chordSymbol === '--' ? (
+                      <span className="text-[#d0c5af]/50">Listening for chord...</span>
+                    ) : (
+                      <>Next: <strong className="text-[#ffe9b0]">Harmonic Voice Leading</strong></>
+                    )}
                   </span>
                 </div>
               </div>
@@ -354,25 +359,31 @@ export const PerformLiveScreen: React.FC<PerformLiveScreenProps> = ({
 
               {/* Visual Scale Degree Strip */}
               <div className="mt-4 bg-[#1e2020] p-3 rounded-xl border border-[#4d4635]/40">
-                <div className="grid grid-cols-7 gap-1.5 text-center font-mono">
-                  {scaleDegrees.map((item, idx) => (
-                    <div
-                      key={`degree-${idx}`}
-                      className={`py-2 rounded-lg border ${
-                        item.isKey
-                          ? 'bg-[#282a2a] border-[#f2ca50]/70 shadow-sm'
-                          : 'bg-[#161818] border-[#4d4635]/30'
-                      }`}
-                    >
-                      <span className={`block text-sm font-bold ${item.isKey ? 'text-[#f2ca50]' : 'text-[#e3e2e2]'}`}>
-                        {item.note}
-                      </span>
-                      <span className={`text-[10px] ${item.isKey ? 'text-[#f2ca50] font-bold' : 'text-[#d0c5af]/70'}`}>
-                        {item.degree}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                {scaleDegrees.length === 0 ? (
+                  <div className="py-2.5 text-center font-mono text-xs text-[#d0c5af]/50">
+                    Play your acoustic instrument or MIDI keys to generate harmonic solo scale degrees in real-time
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-7 gap-1.5 text-center font-mono">
+                    {scaleDegrees.map((item, idx) => (
+                      <div
+                        key={`degree-${idx}`}
+                        className={`py-2 rounded-lg border ${
+                          item.isKey
+                            ? 'bg-[#282a2a] border-[#f2ca50]/70 shadow-sm'
+                            : 'bg-[#161818] border-[#4d4635]/30'
+                        }`}
+                      >
+                        <span className={`block text-sm font-bold ${item.isKey ? 'text-[#f2ca50]' : 'text-[#e3e2e2]'}`}>
+                          {item.note}
+                        </span>
+                        <span className={`text-[10px] ${item.isKey ? 'text-[#f2ca50] font-bold' : 'text-[#d0c5af]/70'}`}>
+                          {item.degree}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
