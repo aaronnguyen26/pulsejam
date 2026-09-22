@@ -107,18 +107,50 @@ echo "3. Creating DMG..."
 rm -f "$OUTPUT_DMG"
 rm -f "$OUTPUT_DIR/rw.PulseJam_0.1.0_aarch64.dmg"
 
-"$DMG_BUILDER" \
-    --volname "PulseJam" \
-    --volicon "$ICNS_FILE" \
-    --icon-size 120 \
-    --window-size 660 400 \
-    --icon "PulseJam.app" 140 180 \
-    --app-drop-link 340 180 \
-    --icon "Open-PulseJam.command" 520 180 \
-    --hide-extension "PulseJam.app" \
-    --hide-extension "Open-PulseJam.command" \
-    "$OUTPUT_DMG" \
-    "$STAGING_DIR"
+# Ensure no stale volume is mounted
+if [ -d "/Volumes/PulseJam" ]; then
+    echo "Detaching stale /Volumes/PulseJam..."
+    hdiutil detach /Volumes/PulseJam -force 2>/dev/null || true
+fi
+
+# Ensure bundle_dmg.sh has macOS Sequoia unmount resilience
+if [ -f "$DMG_BUILDER" ]; then
+    sed -i '' 's/(( exit_code != 16 )) && exit $exit_code/(( exit_code != 16 && exit_code != 2 && exit_code != 1 )) \&\& exit $exit_code/g' "$DMG_BUILDER" 2>/dev/null || true
+    sed -i '' 's/hdiutil detach "${DEV_NAME}"$/hdiutil detach "${DEV_NAME}" || sleep 1 \&\& hdiutil detach "${DEV_NAME}" -force/g' "$DMG_BUILDER" 2>/dev/null || true
+fi
+
+BUILD_SUCCESS=0
+if [ -f "$DMG_BUILDER" ]; then
+    echo "Running custom DMG builder with styled Finder layout..."
+    if "$DMG_BUILDER" \
+        --volname "PulseJam" \
+        --volicon "$ICNS_FILE" \
+        --icon-size 120 \
+        --window-size 660 400 \
+        --icon "PulseJam.app" 140 180 \
+        --app-drop-link 340 180 \
+        --icon "Open-PulseJam.command" 520 180 \
+        --hide-extension "PulseJam.app" \
+        --hide-extension "Open-PulseJam.command" \
+        "$OUTPUT_DMG" \
+        "$STAGING_DIR"; then
+        BUILD_SUCCESS=1
+    else
+        echo "⚠️ Styled builder encountered an unmount issue, falling back to direct compressed DMG creation..."
+    fi
+fi
+
+if [ "$BUILD_SUCCESS" -ne 1 ]; then
+    echo "Creating clean compressed DMG directly..."
+    ln -s /Applications "$STAGING_DIR/Applications" 2>/dev/null || true
+    hdiutil create -srcfolder "$STAGING_DIR" -volname "PulseJam" -format UDZO -ov "$OUTPUT_DMG"
+fi
+
+# Clean up any remaining temporary files
+rm -f "$OUTPUT_DIR/rw.PulseJam_0.1.0_aarch64.dmg"
+if [ -d "/Volumes/PulseJam" ]; then
+    hdiutil detach /Volumes/PulseJam -force 2>/dev/null || true
+fi
 
 echo "4. Copying DMG to public/downloads for static hosting..."
 mkdir -p "$ROOT_DIR/public/downloads"
